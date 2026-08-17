@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  :root {
+    --accent: #E07A5F;
+    --accent-deep: #d96f53;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+  html, body {
+    background: transparent;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif;
+  }
+  .mini {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+  }
+  .circle {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, #F09A80, var(--accent) 55%, var(--accent-deep));
+    box-shadow: 0 6px 20px rgba(224, 122, 95, .45), inset 0 1px 0 rgba(255,255,255,.35);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff;
+    cursor: pointer;
+    transition: transform .08s ease, box-shadow .15s ease;
+    position: relative;
+    touch-action: none;
+  }
+  .circle:active { transform: scale(.94); }
+  .circle.dragging { transform: scale(1.04); box-shadow: 0 10px 28px rgba(224,122,95,.55); }
+  .circle .dong {
+    font-size: 25px; font-weight: 800; letter-spacing: .04em;
+    line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.18);
+  }
+  .circle .count {
+    font-size: 12px; font-weight: 600; opacity: .92;
+    margin-top: 4px; font-variant-numeric: tabular-nums;
+  }
+  .circle .week {
+    font-size: 9.5px; font-weight: 500; opacity: .85;
+    margin-top: 1px; font-variant-numeric: tabular-nums;
+  }
+  /* 点击脉冲 */
+  .pulse { animation: pulse .45s ease; }
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    35% { transform: scale(.88); }
+    100% { transform: scale(1); }
+  }
+  /* 记录成功的涟漪 */
+  .ripple {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 3px solid var(--accent);
+    opacity: 0; pointer-events: none;
+  }
+  .ripple.go { animation: ripple .7s ease-out; }
+  @keyframes ripple {
+    0% { transform: scale(1); opacity: .8; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+  /* 右上角：切回完整版 */
+  .expand {
+    position: absolute; top: 6px; right: 6px;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: rgba(43, 36, 32, .28);
+    color: #fff;
+    border: none; cursor: pointer;
+    display: grid; place-items: center;
+    font-size: 15px; font-weight: 700; line-height: 1;
+    -webkit-app-region: no-drag; /* 窗口无系统拖拽区（JS 拖拽），此行仅为保险 */
+    transition: background .12s, transform .08s;
+    z-index: 5;
+  }
+  .expand:hover { background: rgba(43, 36, 32, .45); }
+  .expand:active { transform: scale(.9); }
+  .expand svg { width: 12px; height: 12px; }
+  /* 底部小圆点：指示置顶 */
+  .corner-dot {
+    position: absolute; bottom: 3px; right: 3px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #6A994E;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    pointer-events: none;
+  }
+  .tooltip {
+    position: fixed; bottom: -8px; left: 50%; transform: translateX(-50%) translateY(100%);
+    background: rgba(43,36,32,.92); color: #fff;
+    font-size: 11px; padding: 4px 10px; border-radius: 8px;
+    white-space: nowrap; opacity: 0; transition: opacity .2s;
+    pointer-events: none; z-index: 10;
+  }
+  .tooltip.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+  <div class="mini">
+    <div class="circle" id="circle">
+      <span class="dong">Dong</span>
+      <span class="count" id="count">--</span>
+      <span class="week" id="week"></span>
+      <span class="ripple" id="ripple"></span>
+    </div>
+    <button class="expand" id="expand" title="回到完整版">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+    </button>
+    <div class="corner-dot"></div>
+  </div>
+  <div class="tooltip" id="tooltip">已记录胎动</div>
+
+<script>
+"use strict";
+/* 迷你窗：点击记录 · 拖拽移动 · 右上角切回完整版 */
+const circle = document.getElementById("circle");
+const countEl = document.getElementById("count");
+const weekEl = document.getElementById("week");
+const ripple = document.getElementById("ripple");
+const tooltip = document.getElementById("tooltip");
+const expandBtn = document.getElementById("expand");
+
+let toastTimer = null;
+function showTooltip(text) {
+  tooltip.textContent = text;
+  tooltip.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => tooltip.classList.remove("show"), 1600);
+}
+
+/* ── 拖拽（JS 实现：与点击兼容） ── */
+let dragState = null;
+
+circle.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  // 先同步占位，位置异步填充——避免快速点击时 mouseup 先于 dragState 触发
+  dragState = { startX: e.screenX, startY: e.screenY, winX: 0, winY: 0, moved: false };
+  window.babybump.miniGetPos().then(pos => {
+    if (dragState) {
+      dragState.winX = pos ? pos.x : 0;
+      dragState.winY = pos ? pos.y : 0;
+    }
+  });
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!dragState) return;
+  const dx = e.screenX - dragState.startX;
+  const dy = e.screenY - dragState.startY;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragState.moved = true;
+  if (dragState.moved) {
+    circle.classList.add("dragging");
+    window.babybump.miniMove(dragState.winX + dx, dragState.winY + dy);
+  }
+});
+
+window.addEventListener("mouseup", async (e) => {
+  if (!dragState) return;
+  const wasDrag = dragState.moved;
+  dragState = null;
+  circle.classList.remove("dragging");
+  if (!wasDrag) {
+    // 单击 = 记录胎动（用 invoke 返回值直接更新，不依赖事件推送）
+    circle.classList.remove("pulse"); void circle.offsetWidth; circle.classList.add("pulse");
+    ripple.classList.remove("go"); void ripple.offsetWidth; ripple.classList.add("go");
+    try {
+      const r = await window.babybump.miniRecord();
+      countEl.textContent = r.todayCount + " 次";
+      showTooltip(r.weight === 1 ? "已记录 ✅" : "已合并 · 连续胎动");
+    } catch (err) {
+      showTooltip("记录失败，请重试");
+    }
+  }
+});
+
+/* ── 切回完整版 ── */
+expandBtn.addEventListener("click", () => {
+  window.babybump.switchMode("full");
+});
+
+/* ── 主进程回传 ── */
+window.babybump.onMiniResult(({ weight, todayCount }) => {
+  countEl.textContent = todayCount + " 次";
+  showTooltip(weight === 1 ? "已记录 ✅" : "已合并 · 连续胎动");
+});
+
+window.babybump.onMiniInit(({ todayCount, weekText }) => {
+  countEl.textContent = todayCount + " 次";
+  weekEl.textContent = weekText || "";
+  // 首次显示引导
+  showTooltip("点击记录 · 拖动换位置");
+});
+
+/* ── 启动时同步 ── */
+(async () => {
+  const state = await window.babybump.load();
+  const today = state.records.filter(r => isToday(r.ts) && r.weight > 0).length;
+  countEl.textContent = today + " 次";
+  weekEl.textContent = weekTextOf(state.settings) || "";
+})();
+
+function isToday(ts) {
+  const d = new Date(ts), t = new Date();
+  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+}
+function weekTextOf(settings) {
+  if (!settings.dueDate) return "";
+  const due = new Date(settings.dueDate + "T00:00:00");
+  if (isNaN(due)) return "";
+  const lmp = new Date(due); lmp.setDate(lmp.getDate() - 280);
+  const days = Math.floor((Date.now() - lmp.getTime()) / 86400000);
+  if (days < 0) return "孕早期";
+  if (days > 294) return "已过预产期";
+  const w = Math.floor(days / 7), d = days % 7;
+  return `孕 ${w} 周 + ${d} 天`;
+}
+</script>
+</body>
+</html>

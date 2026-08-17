@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+release/
+*.dmg
+*.zip
+
+# Local application data and secrets
+babybump-data.json
+*.local
+.env
+.env.*
+!.env.example
+
+# Debugging and logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

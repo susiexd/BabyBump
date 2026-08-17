@@ -1,0 +1,10 @@
+{
+  "name": "BabyBump 手机端胎动记录",
+  "short_name": "BabyBump",
+  "start_url": "./?pwa=1",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#e07a5f",
+  "lang": "zh-CN",
+  "icons": []
+}

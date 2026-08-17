@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BabyBump · 胎动记录</title>
+<style>
+  :root {
+    --bg: #FAF7F2;
+    --surface: #FFFFFF;
+    --surface-2: #F4EFE7;
+    --ink: #2B2420;
+    --ink-2: #6E6259;
+    --ink-3: #9C9086;
+    --line: #E8E0D6;
+    --accent: #E07A5F;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #FBE9E2;
+    --ok: #6A994E;
+    --ok-soft: #EAF3E3;
+    --warn: #C97B2D;
+    --warn-soft: #FCF0DF;
+    --danger: #B5453A;
+    --danger-soft: #FBE7E4;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(43,36,32,.05), 0 8px 24px rgba(43,36,32,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink);
+    font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    display: grid; grid-template-columns: 196px 1fr;
+    height: 100vh; max-width: 1080px; margin: 0 auto;
+    border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+    background: var(--bg);
+  }
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--line);
+    padding: 20px 14px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; }
+  .logo-mark {
+    width: 34px; height: 34px; border-radius: 10px; background: var(--accent);
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .logo-mark svg { width: 20px; height: 20px; }
+  .logo-name { font-weight: 700; font-size: 16px; letter-spacing: .02em; }
+  .logo-sub { font-size: 11px; color: var(--ink-3); margin-top: -2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 9px; cursor: pointer;
+    color: var(--ink-2); font-size: 13.5px; font-weight: 500;
+    border: none; background: transparent; width: 100%; text-align: left;
+    transition: background .12s, color .12s;
+  }
+  .nav-item:hover { background: var(--surface-2); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .nav-item .nicon { width: 17px; height: 17px; flex-shrink: 0; opacity: .9; }
+  .nav-item .nicon svg { width: 17px; height: 17px; }
+  .sidebar-spacer { flex: 1; }
+  .week-badge {
+    margin: 12px 10px 0; padding: 10px 12px; background: var(--surface-2);
+    border-radius: 10px; font-size: 12px; color: var(--ink-2);
+  }
+  .week-badge b { display: block; font-size: 14px; color: var(--ink); margin-bottom: 2px; }
+  .disclaimer-foot { font-size: 10.5px; color: var(--ink-3); padding: 10px; line-height: 1.6; }
+
+  /* ── Main ── */
+  .main { padding: 24px 28px 40px; overflow-y: auto; }
+  .topbar { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+  .topbar h1 { font-size: 20px; font-weight: 700; }
+  .topbar .date { color: var(--ink-3); font-size: 13px; }
+
+  .grid-main { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+
+  /* Record button card */
+  .record-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .record-count { text-align: center; }
+  .record-count .num { font-size: 52px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+  .record-count .num small { font-size: 20px; font-weight: 600; color: var(--ink-3); }
+  .record-count .label { color: var(--ink-2); font-size: 13px; margin-top: 6px; }
+  .kick-btn {
+    width: 208px; height: 208px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink);
+    font-size: 22px; font-weight: 700; font-family: inherit;
+    box-shadow: 0 10px 24px rgba(224,122,95,.38);
+    transition: transform .08s ease, box-shadow .15s ease, background .15s;
+    position: relative; overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+  }
+  .kick-btn:hover { background: #d96f53; }
+  .kick-btn:active { transform: scale(.94); box-shadow: 0 4px 12px rgba(224,122,95,.3); }
+  .kick-btn .kb-sub { display: block; font-size: 13px; font-weight: 500; opacity: .85; margin-top: 4px; }
+  .kick-hint { color: var(--ink-3); font-size: 12px; text-align: center; }
+  .kick-hint kbd {
+    background: var(--surface-2); border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px; font-size: 11px; font-family: inherit; color: var(--ink-2);
+  }
+  .pulse { animation: pulse .45s ease; }
+  @keyframes pulse { 0%{transform:scale(1)} 35%{transform:scale(.92)} 100%{transform:scale(1)} }
+
+  .status-row { display: flex; gap: 8px; width: 100%; justify-content: center; }
+  .chip { padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.off { background: var(--surface-2); color: var(--ink-3); }
+
+  /* Alert */
+  .alert {
+    border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.6;
+    display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left;
+  }
+  .alert.danger { background: var(--danger-soft); color: var(--danger); }
+  .alert.warn { background: var(--warn-soft); color: #8a5a1e; }
+  .alert .a-ico { font-size: 16px; line-height: 1.3; }
+  .alert b { display: block; margin-bottom: 2px; }
+  .alert .a-note { font-size: 11.5px; opacity: .8; margin-top: 4px; }
+
+  /* Session card */
+  .session-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px; box-shadow: var(--shadow);
+  }
+  .sc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .sc-head h3 { font-size: 14px; font-weight: 700; }
+  .sc-head .sc-meta { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .sc-progress { height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin: 10px 0 8px; }
+  .sc-progress > div { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s ease; }
+  .sc-stats { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .sc-stats b { color: var(--ink); font-size: 15px; }
+  .btn {
+    border: none; border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    font-family: inherit; cursor: pointer; transition: background .12s;
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #d96f53; }
+  .btn.ghost { background: var(--surface-2); color: var(--ink-2); }
+  .btn.ghost:hover { background: #ece4d8; }
+  .btn.sm { padding: 5px 10px; font-size: 12px; }
+  .sc-actions { margin-top: 12px; display: flex; gap: 8px; }
+  .sc-note { font-size: 11.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.55; }
+
+  /* Panel (right column) */
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px; box-shadow: var(--shadow); margin-bottom: 18px;
+  }
+  .panel h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .panel h3 .hint { font-size: 11px; color: var(--ink-3); font-weight: 400; }
+
+  /* Timeline */
+  .tl { list-style: none; max-height: 300px; overflow-y: auto; }
+  .tl li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .tl li:last-child { border-bottom: none; }
+  .tl .t-time { font-variant-numeric: tabular-nums; font-weight: 600; width: 52px; flex-shrink: 0; }
+  .tl .t-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .tl .t-gap { margin-left: auto; color: var(--ink-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+  /* Hour bars */
+  .hbars { display: flex; align-items: flex-end; gap: 3px; height: 72px; margin-top: 4px; }
+  .hbars .bar { flex: 1; background: var(--surface-2); border-radius: 3px 3px 0 0; position: relative; min-height: 3px; }
+  .hbars .bar.filled { background: var(--accent); }
+  .hbars .bar.active { background: var(--ok); }
+  .hbars .bar:hover::after {
+    content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; font-size: 10.5px; padding: 3px 7px; border-radius: 5px; white-space: nowrap; z-index: 5;
+  }
+  .hbar-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-3); margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+  /* Timeline empty */
+  .empty { color: var(--ink-3); font-size: 12.5px; text-align: center; padding: 18px 0; line-height: 1.7; }
+
+  /* History view */
+  .chart-card { margin-bottom: 18px; }
+  .chart-wrap { position: relative; height: 200px; }
+  .chart-svg { width: 100%; height: 100%; }
+  .chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-2); margin-bottom: 8px; }
+  .chart-legend .lg { display: flex; align-items: center; gap: 6px; }
+  .chart-legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .hist-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .hist-table th, .hist-table td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  .hist-table th:first-child, .hist-table td:first-child { text-align: left; }
+  .hist-table th { color: var(--ink-3); font-weight: 500; font-size: 11.5px; }
+  .hist-table tr.normal td { color: var(--ok); }
+  .hist-table tr.low td { color: var(--danger); }
+  .hist-table .bar-cell { width: 34%; }
+  .hist-table .mini-bar { height: 7px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+  .hist-table .mini-bar > div { height: 100%; border-radius: 99px; background: var(--accent); }
+  .hist-table tr.low .mini-bar > div { background: var(--danger); }
+  .seg { display: flex; gap: 6px; margin-bottom: 12px; }
+  .seg button {
+    flex: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 8px;
+    padding: 6px 0; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Settings */
+  .set-group { margin-bottom: 22px; }
+  .set-group h3 { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 10px; }
+  .set-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .set-row:last-child { border-bottom: none; }
+  .set-row .desc { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+  .set-row select, .set-row input[type=number] {
+    border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; font-size: 12.5px;
+    font-family: inherit; background: var(--surface); color: var(--ink);
+  }
+  .toggle { width: 40px; height: 23px; border-radius: 99px; background: var(--surface-2); border: none; cursor: pointer; position: relative; transition: background .15s; flex-shrink: 0; }
+  .toggle.on { background: var(--ok); }
+  .toggle::after { content: ""; position: absolute; top: 2.5px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .toggle.on::after { left: 19px; }
+
+  /* Demo bar */
+  .demo-bar {
+    display: flex; gap: 8px; align-items: center; margin-top: 16px; padding-top: 14px;
+    border-top: 1px dashed var(--line); font-size: 11.5px; color: var(--ink-3);
+  }
+  .demo-bar .btn { font-size: 11.5px; padding: 4px 10px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%) translateY(-8px);
+    background: var(--ink); color: #fff; padding: 9px 18px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: all .25s ease; z-index: 50;
+    box-shadow: 0 8px 20px rgba(0,0,0,.18);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .grid-main { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ═══ Sidebar ═══ -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21C8 17 4.5 14 4.5 9.8A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.2C19.5 14 16 17 12 21Z"/></svg>
+      </div>
+      <div>
+        <div class="logo-name">BabyBump</div>
+        <div class="logo-sub">胎动记录</div>
+      </div>
+    </div>
+    <button class="nav-item active" data-view="today"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 9h18M9 3v6M15 3v6"/></svg></span>今天</button>
+    <button class="nav-item" data-view="history"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span>趋势</button>
+    <button class="nav-item" data-view="settings"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg></span>设置</button>
+    <div class="sidebar-spacer"></div>
+    <div class="week-badge"><b>孕 32 周 + 3 天</b>预产期 2026-10-04</div>
+    <div class="disclaimer-foot">BabyBump 仅做记录与趋势提示，<b>不构成医疗诊断</b>。胎动明显减少或消失时，请立即联系产科医生。</div>
+  </aside>
+
+  <!-- ═══ Main ═══ -->
+  <main class="main" id="view-today">
+    <div class="topbar">
+      <h1>今天</h1>
+      <span class="date" id="today-date"></span>
+    </div>
+
+    <div class="grid-main">
+      <div>
+        <!-- Record card -->
+        <div class="record-card" style="margin-bottom:18px;">
+          <div class="record-count">
+            <div class="num" id="today-total">0 <small>次</small></div>
+            <div class="label" id="today-label">今天还没有记录 · 感受到胎动就点一下</div>
+          </div>
+          <button class="kick-btn" id="kick-btn">
+            点我记录胎动
+            <span class="kb-sub">感受到 "dong" 就点</span>
+          </button>
+          <div class="status-row" id="status-row">
+            <span class="chip off" id="chip-state">--</span>
+            <span class="chip off" id="chip-baseline">基线 --</span>
+          </div>
+          <div class="kick-hint">快捷键 <kbd>Space</kbd> · 托盘常驻，随时可点</div>
+          <div id="alert-slot"></div>
+          <div class="demo-bar">
+            <span>演示：</span>
+            <button class="btn ghost" id="demo-fill">填充近 7 天数据</button>
+            <button class="btn ghost" id="demo-low">模拟"今天胎动减少"</button>
+            <button class="btn ghost" id="demo-reset">清空重来</button>
+          </div>
+        </div>
+
+        <!-- Session -->
+        <div class="session-card">
+          <div class="sc-head">
+            <h3>定时计数会话</h3>
+            <span class="sc-meta" id="session-meta">未开始</span>
+          </div>
+          <div class="sc-progress"><div id="session-bar" style="width:0%"></div></div>
+          <div class="sc-stats">
+            <span>已计 <b id="session-count">0</b> 次</span>
+            <span>经过 <b id="session-elapsed">--:--</b></span>
+            <span>目标 <b>10 次 / 2 小时</b></span>
+          </div>
+          <div class="sc-actions">
+            <button class="btn primary" id="session-start" style="flex:1">开始晚间计数（20:00 起）</button>
+            <button class="btn ghost" id="session-stop" style="display:none">结束</button>
+          </div>
+          <div class="sc-note">按指南建议：选宝宝活跃时段，专注感受；连续滚动 1 分钟内算 1 次。达到 10 次即完成今日计数。</div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div>
+        <div class="panel">
+          <h3>今日时间线 <span class="hint" id="tl-hint"></span></h3>
+          <ul class="tl" id="timeline"><li class="empty" style="list-style:none">还没有记录。<br>现在去点一下中间的按钮吧。</li></ul>
+        </div>
+        <div class="panel">
+          <h3>小时分布 <span class="hint">活跃时段</span></h3>
+          <div class="hbars" id="hbars"></div>
+          <div class="hbar-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+        </div>
+        <div class="panel">
+          <h3>与基线的对比 <span class="hint">近 7 天</span></h3>
+          <div id="baseline-box"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- History view -->
+  <main class="main" id="view-history" style="display:none">
+    <div class="topbar">
+      <h1>趋势</h1>
+      <span class="date">近 7 天 / 30 天</span>
+    </div>
+    <div class="seg" id="hist-seg">
+      <button class="active" data-range="7">近 7 天</button>
+      <button data-range="30">近 30 天</button>
+    </div>
+    <div class="panel chart-card">
+      <h3>每日胎动次数</h3>
+      <div class="chart-wrap"><svg class="chart-svg" id="line-chart"></svg></div>
+    </div>
+    <div class="panel chart-card">
+      <h3>明细</h3>
+      <table class="hist-table" id="hist-table"></table>
+    </div>
+  </main>
+
+  <!-- Settings view -->
+  <main class="main" id="view-settings" style="display:none">
+    <div class="topbar"><h1>设置</h1><span class="date">记录与提醒</span></div>
+    <div class="panel">
+      <div class="set-group">
+        <h3>记录</h3>
+        <div class="set-row">
+          <div>全局快捷键<span class="desc">任意界面按下即可记录，无需切到应用</span></div>
+          <select id="set-shortcut"><option value="space">空格键 Space</option><option value="cmd">⌘ + K</option><option value="ctrl">Ctrl + Shift + K</option></select>
+        </div>
+        <div class="set-row">
+          <div>连续胎动合并<span class="desc">1 分钟内连续点击计为 1 次（医学计数规则）</span></div>
+          <select id="set-merge"><option value="60">1 分钟</option><option value="30">30 秒</option><option value="0">不合并</option></select>
+        </div>
+        <div class="set-row">
+          <div>计数目标<span class="desc">定时会话的默认目标次数</span></div>
+          <select id="set-goal"><option value="10">10 次</option><option value="12">12 次</option><option value="8">8 次</option></select>
+        </div>
+      </div>
+      <div class="set-group">
+        <h3>提醒</h3>
+        <div class="set-row">
+          <div>每日计数提醒<span class="desc">每天 20:00 提醒"该数胎动了"</span></div>
+          <button class="toggle on" id="set-remind"></button>
+        </div>
+        <div class="set-row">
+          <div>异常模式提醒<span class="desc">当日次数低于基线 50% 时给出提示</span></div>
+          <button class="toggle on" id="set-anomaly"></button>
+        </div>
+      </div>
+      <div class="set-group">
+        <h3>数据</h3>
+        <div class="set-row">
+          <div>导出数据<span class="desc">PNG 趋势图 / CSV，产检时给医生看</span></div>
+          <button class="btn ghost sm" id="btn-export">导出 CSV</button>
+        </div>
+        <div class="set-row">
+          <div>存储方式<span class="desc">演示原型：数据保存在本机浏览器</span></div>
+          <span class="sc-note" style="margin:0">localStorage · 本地</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ══════════════ Storage ══════════════ */
+const STORE_KEY = "babybump_demo_v1";
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { records: [], settings: {} }; }
+  catch (e) { return { records: [], settings: {} }; }
+}
+function saveState(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+let state = loadState();
+if (!state.settings) state.settings = {};
+const settings = state.settings;
+const set = (k, v) => { settings[k] = v; saveState(state); };
+
+/* ══════════════ Date helpers ══════════════ */
+const fmtTime = ts => new Date(ts).toTimeString().slice(0,5);
+const fmtDate = ts => { const d = new Date(ts); return `${d.getMonth()+1}月${d.getDate()}日`; };
+const dayKey = ts => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
+const todayKey = () => dayKey(Date.now());
+const isToday = ts => dayKey(ts) === todayKey();
+
+function todayRecords() { return state.records.filter(r => isToday(r.ts)); }
+function recordsByDay(days) {
+  const map = new Map();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    map.set(`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`, { key: dayKey(d.getTime()), ts: d.getTime(), n: 0, records: [] });
+  }
+  for (const r of state.records) {
+    const k = dayKey(r.ts);
+    if (map.has(k)) { map.get(k).n += r.weight; map.get(k).records.push(r); }
+  }
+  return [...map.values()];
+}
+
+/* merge rule: consecutive clicks within N seconds count as weight 1 */
+const mergeMs = () => (parseInt(settings.mergeSec || 60, 10)) * 1000;
+function computeWeight(ts) {
+  const prev = state.records.filter(r => isToday(r.ts)).slice(-1)[0];
+  if (prev && settings.mergeSec !== 0 && (ts - prev.ts) < mergeMs()) return 0;
+  return 1;
+}
+
+/* ══════════════ Core: record a kick ══════════════ */
+function recordKick(ts = Date.now()) {
+  const weight = computeWeight(ts);
+  state.records.push({ id: Date.now() + Math.random(), ts, weight, src: "manual" });
+  saveState(state);
+  renderAll();
+  if (weight === 1) {
+    toast("已记录 · " + fmtTime(ts));
+    const btn = document.getElementById("kick-btn");
+    btn.classList.remove("pulse"); void btn.offsetWidth; btn.classList.add("pulse");
+  } else {
+    toast("1 分钟内连续胎动，已合并为 1 次");
+  }
+}
+
+/* ══════════════ Baseline & anomaly ══════════════ */
+function baseline() {
+  const days = recordsByDay(8).slice(0, 7); // last 7 full days
+  const vals = days.map(d => d.n).filter(n => n > 0);
+  if (!vals.length) return null;
+  vals.sort((a,b) => a-b);
+  const mid = Math.floor(vals.length/2);
+  return vals.length % 2 ? vals[mid] : Math.round((vals[mid-1]+vals[mid])/2);
+}
+function anomalyInfo() {
+  if (settings.anomaly === false) return null;
+  const today = todayRecords().reduce((s,r) => s + r.weight, 0);
+  const base = baseline();
+  if (!base || base === 0 || today === 0) return null;
+  if (today < base * 0.5) return { today, base, pct: Math.round(today/base*100) };
+  return null;
+}
+
+/* ══════════════ Rendering: Today ══════════════ */
+function renderAll() { renderToday(); renderHistory(); renderSettings(); }
+
+function renderToday() {
+  const recs = todayRecords().filter(r => r.weight > 0);
+  const total = recs.reduce((s,r) => s + r.weight, 0);
+  document.getElementById("today-total").innerHTML = total + " <small>次</small>";
+  document.getElementById("today-label").textContent =
+    total === 0 ? "今天还没有记录 · 感受到胎动就点一下"
+    : total < 10 ? `已有 ${total} 次 · 继续感受，每次胎动都值得记录`
+    : "今天已记录 " + total + " 次，继续保持";
+
+  /* status chips */
+  const base = baseline();
+  const chipState = document.getElementById("chip-state");
+  const chipBase = document.getElementById("chip-baseline");
+  if (base === null) {
+    chipState.className = "chip off"; chipState.textContent = "--";
+    chipBase.className = "chip off"; chipBase.textContent = "基线 --";
+  } else {
+    chipBase.className = "chip ok"; chipBase.textContent = `基线 ${base} 次/天`;
+    const today = todayRecords().reduce((s,r) => s + r.weight, 0);
+    if (today === 0) { chipState.className = "chip off"; chipState.textContent = "今日未记录"; }
+    else if (today < base * 0.5) { chipState.className = "chip warn"; chipState.textContent = `今日偏低 ${Math.round(today/base*100)}%`; }
+    else if (today >= base * 0.8) { chipState.className = "chip ok"; chipState.textContent = "与平时相近"; }
+    else { chipState.className = "chip warn"; chipState.textContent = "略低于平时"; }
+  }
+
+  /* alert */
+  const slot = document.getElementById("alert-slot");
+  const anom = anomalyInfo();
+  if (anom) {
+    slot.innerHTML = `
+      <div class="alert danger">
+        <span class="a-ico">⚠️</span>
+        <div><b>今天胎动明显少于平时</b>
+        今天 ${anom.today} 次，比近 7 天基线（${anom.base} 次/天）低 ${100 - anom.pct}%。
+        请先尝试左侧卧位、专注感受 1~2 小时；若仍明显减少或胎动消失，<b>请立即联系产科医生</b>。
+        <div class="a-note">提醒仅供参考，不构成医疗诊断。</div></div>
+      </div>`;
+  } else if (base !== null && total === 0 && new Date().getHours() >= 20) {
+    slot.innerHTML = `
+      <div class="alert warn">
+        <span class="a-ico">⏰</span>
+        <div><b>到晚间计数时间了</b>建议在下方开始一次 2 小时计数会话，记录今天宝宝的活跃情况。</div>
+      </div>`;
+  } else {
+    slot.innerHTML = "";
+  }
+
+  /* timeline */
+  const tl = document.getElementById("timeline");
+  document.getElementById("tl-hint").textContent = recs.length ? `共 ${recs.length} 条` : "";
+  if (!recs.length) {
+    tl.innerHTML = `<li class="empty" style="list-style:none">还没有记录。<br>现在去点一下中间的按钮吧。</li>`;
+  } else {
+    tl.innerHTML = recs.slice().reverse().map((r, i) => {
+      const prev = recs[recs.length - 1 - i - 1];
+      const gap = prev ? `距上次 ${((r.ts - prev.ts)/60000).toFixed(0)} 分` : "";
+      return `<li><span class="t-time">${fmtTime(r.ts)}</span><span class="t-dot"></span><span>${r.src === "session" ? "会话计数" : "随手记录"}</span><span class="t-gap">${gap}</span></li>`;
+    }).join("");
+  }
+
+  /* hour bars */
+  const hbars = document.getElementById("hbars");
+  const hourCounts = new Array(24).fill(0);
+  for (const r of recs) hourCounts[new Date(r.ts).getHours()]++;
+  const max = Math.max(1, ...hourCounts);
+  const curHour = new Date().getHours();
+  hbars.innerHTML = hourCounts.map((n, h) => {
+    const cls = n > 0 ? "bar filled" : "bar";
+    return `<div class="${cls}${h === curHour && n > 0 ? " active" : ""}" style="height:${Math.max(4, Math.round(n/max*100))}%" data-tip="${h}:00 · ${n} 次"></div>`;
+  }).join("");
+
+  /* baseline box */
+  const box = document.getElementById("baseline-box");
+  if (base === null) {
+    box.innerHTML = `<div class="empty">需要至少 1 天的记录才能建立基线。<br>坚持记录几天，就能看到"今天是否和平时一样"。</div>`;
+  } else {
+    const today = todayRecords().reduce((s,r) => s + r.weight, 0);
+    const pct = base === 0 ? 0 : Math.round(today / base * 100);
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--ink-2)">今天 / 近7天中位数</span>
+        <span style="font-weight:700;font-variant-numeric:tabular-nums">${today} / ${base} 次</span>
+      </div>
+      <div class="sc-progress" style="margin:0"><div style="width:${Math.min(100, pct)}%"></div></div>
+      <div style="font-size:11.5px;color:var(--ink-3);margin-top:8px">${pct >= 100 ? "与平时相近或更多 ✅" : pct >= 50 ? `约为平时的 ${pct}%，仍在正常范围` : `仅为平时的 ${pct}%，明显偏低 ⚠️`}</div>`;
+  }
+
+  renderSession();
+}
+
+/* ══════════════ Session ══════════════ */
+let session = null;
+let sessionTimer = null;
+function renderSession() {
+  const meta = document.getElementById("session-meta");
+  const bar = document.getElementById("session-bar");
+  const cnt = document.getElementById("session-count");
+  const ela = document.getElementById("session-elapsed");
+  const startBtn = document.getElementById("session-start");
+  const stopBtn = document.getElementById("session-stop");
+
+  if (!session) {
+    meta.textContent = "未开始";
+    cnt.textContent = "0"; ela.textContent = "--:--";
+    bar.style.width = "0%";
+    startBtn.style.display = ""; stopBtn.style.display = "none";
+    return;
+  }
+  const count = session.count;
+  const goal = parseInt(settings.goal || 10, 10);
+  const elapsed = Math.floor((Date.now() - session.start) / 1000);
+  meta.textContent = "进行中";
+  cnt.textContent = count; ela.textContent = fmtDur(elapsed);
+  bar.style.width = Math.min(100, count / goal * 100) + "%";
+  startBtn.style.display = "none"; stopBtn.style.display = "";
+  if (count >= goal) {
+    meta.textContent = "✅ 已达标";
+    toast("🎉 达到 " + goal + " 次目标！");
+  }
+}
+const fmtDur = s => {
+  const m = Math.floor(s/60), ss = s % 60;
+  return `${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+};
+
+document.getElementById("session-start").addEventListener("click", () => {
+  session = { start: Date.now(), count: 0 };
+  sessionTimer = setInterval(renderSession, 1000);
+  renderSession();
+  toast("计数会话开始 · 感受到胎动就点中间按钮");
+});
+document.getElementById("session-stop").addEventListener("click", () => {
+  clearInterval(sessionTimer);
+  session = null;
+  renderSession();
+  toast("会话已结束");
+});
+
+/* kicks during session are tagged */
+recordKick = function(ts = Date.now()) {
+  const weight = computeWeight(ts);
+  state.records.push({ id: Date.now() + Math.random(), ts, weight, src: session ? "session" : "manual" });
+  if (session) { session.count += weight; renderSession(); }
+  saveState(state);
+  renderAll();
+  if (weight === 1) {
+    toast("已记录 · " + fmtTime(ts));
+    const btn = document.getElementById("kick-btn");
+    btn.classList.remove("pulse"); void btn.offsetWidth; btn.classList.add("pulse");
+  } else {
+    toast("1 分钟内连续胎动，已合并为 1 次");
+  }
+};
+
+/* ══════════════ History ══════════════ */
+let histRange = 7;
+function renderHistory() {
+  const days = recordsByDay(histRange);
+  drawLine(days);
+  const table = document.getElementById("hist-table");
+  const base = baseline();
+  table.innerHTML = `<tr><th>日期</th><th>次数</th><th style="text-align:left">相对基线</th></tr>` +
+    days.map(d => {
+      const cls = d.n === 0 ? "" : (base && d.n < base * 0.5 ? "low" : "normal");
+      const pct = base ? Math.min(100, Math.round(d.n / base * 100)) : 0;
+      return `<tr class="${cls}"><td>${fmtDate(d.ts)}${dayKey(d.ts) === todayKey() ? " · 今天" : ""}</td>
+        <td>${d.n}${d.n === 0 ? "" : " 次"}</td>
+        <td class="bar-cell"><div class="mini-bar"><div style="width:${pct}%"></div></div></td></tr>`;
+    }).join("");
+}
+
+function drawLine(days) {
+  const svg = document.getElementById("line-chart");
+  const W = svg.clientWidth || 600, H = 200;
+  const P = { l: 34, r: 10, t: 14, b: 26 };
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const max = Math.max(1, ...days.map(d => d.n), 10);
+  const x = i => P.l + (days.length === 1 ? iw/2 : i * iw / (days.length - 1));
+  const y = n => P.t + ih - n / max * ih;
+  let html = "";
+  /* grid lines */
+  for (let g = 0; g <= 4; g++) {
+    const gy = P.t + ih * g / 4;
+    html += `<line x1="${P.l}" y1="${gy}" x2="${W-P.r}" y2="${gy}" stroke="#EDE6DC" stroke-width="1"/>`;
+    const val = Math.round(max - max * g / 4);
+    html += `<text x="${P.l-8}" y="${gy+4}" font-size="10" fill="#9C9086" text-anchor="end">${val}</text>`;
+  }
+  /* baseline reference */
+  const base = baseline();
+  if (base) {
+    const by = y(base);
+    html += `<line x1="${P.l}" y1="${by}" x2="${W-P.r}" y2="${by}" stroke="#6A994E" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+    html += `<text x="${W-P.r-4}" y="${by-5}" font-size="10" fill="#6A994E" text-anchor="end">基线 ${base}</text>`;
+  }
+  /* area + line */
+  const pts = days.map((d,i) => `${x(i)},${y(d.n)}`).join(" ");
+  html += `<polygon points="${P.l},${P.t+ih} ${pts} ${x(days.length-1)},${P.t+ih}" fill="#FBE9E2" opacity="0.6"/>`;
+  html += `<polyline points="${pts}" fill="none" stroke="#E07A5F" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  /* dots */
+  days.forEach((d,i) => {
+    const low = base && d.n > 0 && d.n < base * 0.5;
+    const color = low ? "#B5453A" : (d.n === 0 ? "#C9BEB2" : "#E07A5F");
+    html += `<circle cx="${x(i)}" cy="${y(d.n)}" r="3.5" fill="${color}"/>`;
+    html += `<text x="${x(i)}" y="${H-6}" font-size="9.5" fill="#9C9086" text-anchor="middle">${days[i].key.slice(5).replace("-","/")}</text>`;
+  });
+  svg.innerHTML = html;
+}
+
+/* ══════════════ Settings ══════════════ */
+function renderSettings() {
+  document.getElementById("set-shortcut").value = settings.shortcut || "space";
+  document.getElementById("set-merge").value = settings.mergeSec == null ? "60" : String(settings.mergeSec);
+  document.getElementById("set-goal").value = settings.goal || "10";
+  document.getElementById("set-remind").classList.toggle("on", settings.remind !== false);
+  document.getElementById("set-anomaly").classList.toggle("on", settings.anomaly !== false);
+}
+
+/* ══════════════ Demo data ══════════════ */
+function seedDemo() {
+  const now = Date.now();
+  const recs = [];
+  for (let d = 7; d >= 1; d--) {
+    const day = new Date(now); day.setHours(0,0,0,0); day.setDate(day.getDate() - d);
+    const base = 26 + Math.round(Math.random() * 8);
+    const spread = Math.round(base * 0.25);
+    const n = base + Math.round((Math.random() * 2 - 1) * spread);
+    const evening = Math.round(n * 0.45);
+    for (let i = 0; i < evening; i++) {
+      const t = day.getTime() + (19.5 + Math.random() * 2.5) * 3600e3;
+      recs.push({ id: t + i, ts: t, weight: 1, src: "session" });
+    }
+    const morning = n - evening;
+    for (let i = 0; i < morning; i++) {
+      const t = day.getTime() + (8 + Math.random() * 3.5) * 3600e3;
+      recs.push({ id: t + i + 1e9, ts: t, weight: 1, src: "manual" });
+    }
+  }
+  /* one low day 3 days ago */
+  const lowDay = new Date(now); lowDay.setHours(0,0,0,0); lowDay.setDate(lowDay.getDate() - 3);
+  recs.forEach(r => { if (dayKey(r.ts) === dayKey(lowDay.getTime())) r.weight = 0; });
+  /* today: a few morning kicks */
+  const today = new Date(now); today.setHours(9, 10 + Math.random()*50, 0, 0);
+  for (let i = 0; i < 4; i++) recs.push({ id: today.getTime() + i, ts: today.getTime() + i * 8 * 60e3, weight: 1, src: "manual" });
+
+  state.records = recs;
+  saveState(state);
+  renderAll();
+  toast("已填充近 7 天演示数据（含 1 个「减少日」）");
+}
+function demoLowToday() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  state.records = state.records.filter(r => dayKey(r.ts) !== todayKey());
+  for (let i = 0; i < 2; i++) state.records.push({ id: Date.now()+i, ts: today.getTime() + (10 + i*20)*60e3, weight: 1, src: "manual" });
+  saveState(state);
+  renderAll();
+  toast("已模拟「今天仅 2 次」——看看异常提醒");
+}
+
+/* ══════════════ Events ══════════════ */
+document.getElementById("kick-btn").addEventListener("click", () => recordKick());
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && !e.repeat && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) {
+    e.preventDefault();
+    recordKick();
+  }
+});
+document.querySelectorAll(".nav-item").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const v = btn.dataset.view;
+    ["today","history","settings"].forEach(k => {
+      document.getElementById("view-" + k).style.display = k === v ? "" : "none";
+    });
+  });
+});
+document.getElementById("hist-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#hist-seg button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  histRange = parseInt(b.dataset.range, 10);
+  renderHistory();
+});
+document.getElementById("demo-fill").addEventListener("click", seedDemo);
+document.getElementById("demo-low").addEventListener("click", demoLowToday);
+document.getElementById("demo-reset").addEventListener("click", () => {
+  state.records = []; saveState(state); renderAll();
+  toast("已清空，从零开始记录");
+});
+document.getElementById("set-shortcut").addEventListener("change", e => set("shortcut", e.target.value));
+document.getElementById("set-merge").addEventListener("change", e => set("mergeSec", parseInt(e.target.value, 10)));
+document.getElementById("set-goal").addEventListener("change", e => set("goal", e.target.value));
+document.getElementById("set-remind").addEventListener("click", e => {
+  const on = settings.remind !== false;
+  set("remind", !on);
+  e.target.classList.toggle("on", !on);
+  toast(!on ? "每日提醒已关闭" : "每日 20:00 提醒已开启");
+});
+document.getElementById("set-anomaly").addEventListener("click", e => {
+  const on = settings.anomaly !== false;
+  set("anomaly", !on);
+  e.target.classList.toggle("on", !on);
+  toast(!on ? "异常提醒已关闭" : "异常模式提醒已开启");
+});
+document.getElementById("btn-export").addEventListener("click", () => {
+  const rows = [["日期","时间","来源"]];
+  state.records.slice().sort((a,b) => a.ts - b.ts).forEach(r => {
+    rows.push([fmtDate(r.ts), fmtTime(r.ts), r.src === "session" ? "会话" : "随手"]);
+  });
+  const csv = "\ufeff" + rows.map(r => r.join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "BabyBump-胎动记录.csv";
+  a.click();
+  toast("CSV 已导出");
+});
+
+/* toast */
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+/* ══════════════ Init ══════════════ */
+document.getElementById("today-date").textContent =
+  new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+renderAll();
+</script>
+</body>
+</html>

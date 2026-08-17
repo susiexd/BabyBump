@@ -1,0 +1,15 @@
+{
+  "name": "babybump",
+  "version": "0.1.0",
+  "description": "胎动记录桌面应用 · 孕晚期胎动监测",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

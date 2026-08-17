@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e07a5f">
+  <meta name="description" content="BabyBump 手机端胎动记录">
+  <link rel="manifest" href="manifest.json">
+  <title>BabyBump · 手机记录</title>
+  <style>
+    :root { --bg:#faf7f2; --surface:#fff; --ink:#2b2420; --muted:#84776d; --accent:#e07a5f; --soft:#fbe9e2; --ok:#6a994e; --line:#eadfd5; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    .app { max-width:520px; min-height:100vh; margin:auto; padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; }
+    header { display:flex; justify-content:space-between; align-items:flex-start; }
+    h1 { margin:0; font-size:24px; letter-spacing:.02em; } h1 small { display:block; color:var(--muted); font-size:12px; font-weight:500; margin-top:2px; }
+    .sync-dot { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; } .dot { width:8px; height:8px; border-radius:50%; background:#c9bdb2; } .dot.ok { background:var(--ok); }
+    .hero { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:410px; }
+    .kick { width:min(72vw,280px); height:min(72vw,280px); max-width:280px; max-height:280px; border:0; border-radius:50%; color:white; background:radial-gradient(circle at 32% 25%,#f2a088,var(--accent) 58%,#d96f53); box-shadow:0 16px 38px rgba(224,122,95,.3),inset 0 2px rgba(255,255,255,.3); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:transform .1s; -webkit-tap-highlight-color:transparent; }
+    .kick:active { transform:scale(.95); } .count { font-size:64px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; } .count small { font-size:18px; font-weight:600; margin-left:4px; }
+    .kick-label { margin-top:14px; font-size:18px; font-weight:650; } .hint { color:var(--muted); font-size:13px; margin-top:18px; text-align:center; }
+    .cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .card { padding:14px; border:1px solid var(--line); border-radius:14px; background:var(--surface); } .label { color:var(--muted); font-size:12px; } .value { margin-top:3px; font-size:21px; font-weight:750; font-variant-numeric:tabular-nums; }
+    .toolbar { display:flex; gap:10px; margin-top:14px; } button.secondary { flex:1; border:1px solid var(--line); border-radius:11px; background:var(--surface); color:var(--ink); padding:11px; font:inherit; cursor:pointer; } button.secondary:active { background:var(--soft); }
+    .records { margin-top:18px; } .records h2 { font-size:15px; margin:0 0 8px; } .record { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; } .record span:last-child { color:var(--muted); }
+    dialog { width:min(92vw,420px); border:0; border-radius:18px; padding:20px; color:var(--ink); box-shadow:0 20px 60px rgba(43,36,32,.25); } dialog::backdrop { background:rgba(43,36,32,.35); } dialog h2 { margin:0 0 8px; font-size:18px; } dialog p { color:var(--muted); font-size:13px; word-break:break-all; } .pair { display:flex; gap:8px; } .pair input { min-width:0; flex:1; border:1px solid var(--line); border-radius:8px; padding:9px; font:12px monospace; } .close { margin-top:12px; width:100%; padding:10px; border:0; border-radius:9px; background:var(--accent); color:white; font:inherit; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header><h1>BabyBump<small>手机端胎动记录</small></h1><div class="sync-dot"><i class="dot" id="dot"></i><span id="syncText">仅本地</span></div></header>
+    <section class="hero"><button class="kick" id="kick"><span class="count" id="count">0<small>次</small></span><span class="kick-label">记录胎动</span></button><div class="hint">感受到胎动就点一下<br>1 分钟内连续胎动会自动合并</div></section>
+    <section class="cards"><div class="card"><div class="label">今日有效记录</div><div class="value" id="today">0 次</div></div><div class="card"><div class="label">最近一次</div><div class="value" id="last">--:--</div></div></section>
+    <div class="toolbar"><button class="secondary" id="sync">立即同步</button><button class="secondary" id="pair">查看配对地址</button></div>
+    <section class="records"><h2>今日时间线</h2><div id="list"><div class="record"><span>还没有记录</span><span>点一下上方按钮</span></div></div></section>
+  </main>
+  <dialog id="dialog"><h2>连接到桌面端</h2><p>请确保手机和电脑连接同一个 Wi‑Fi，然后在手机浏览器打开下面的地址。地址包含配对令牌，请不要分享给他人。</p><div class="pair"><input id="url" readonly><button class="secondary" id="copy">复制</button></div><button class="close" id="close">知道了</button></dialog>
+<script>
+'use strict';
+const KEY='babybump-pwa-state';
+let state=JSON.parse(localStorage.getItem(KEY)||'{"records":[],"settings":{}}');
+const query = new URLSearchParams(location.search);
+const token = query.get('token') || localStorage.getItem('babybump-token') || '';
+const apiUrl = location.origin;
+if (query.get('token')) localStorage.setItem('babybump-token', query.get('token'));
+const $=id=>document.getElementById(id); const dayKey=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`}; const todayKey=()=>dayKey(Date.now());
+function validRecords(){return state.records.filter(r=>r.weight>0&&dayKey(r.ts)===todayKey()).sort((a,b)=>a.ts-b.ts)}
+function save(){localStorage.setItem(KEY,JSON.stringify(state));}
+function render(){const recs=validRecords(); $('count').innerHTML=`${recs.length}<small>次</small>`; $('today').textContent=`${recs.length} 次`; $('last').textContent=recs.length?new Date(recs[recs.length-1].ts).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}):'--:--'; $('list').innerHTML=recs.length?recs.slice().reverse().map(r=>`<div class="record"><span>${new Date(r.ts).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</span><span>${r.src==='mobile'?'手机记录':'已同步'}</span></div>`).join(''):'<div class="record"><span>还没有记录</span><span>点一下上方按钮</span></div>';}
+function record(){const now=Date.now();const all=state.records.filter(r=>dayKey(r.ts)===todayKey()).sort((a,b)=>a.ts-b.ts);const prev=all[all.length-1];const merge=Number(state.settings.mergeSec??60)*1000;const weight=prev&&state.settings.mergeSec!==0&&now-prev.ts<merge?0:1;state.records.push({id:`mobile-${now}-${Math.random().toString(16).slice(2)}`,ts:now,weight,src:'mobile'});save();render();sync(true);}
+async function sync(push=true){if(!token||!apiUrl){$('syncText').textContent='仅本地';return} $('syncText').textContent='同步中…';try{if(push){const r=await fetch(apiUrl+'/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-BabyBump-Token':token},body:JSON.stringify({records:state.records,settings:state.settings})});if(!r.ok)throw Error('post');state=await r.json();}else{const r=await fetch(apiUrl+'/api/state?token='+encodeURIComponent(token));if(!r.ok)throw Error('get');const remote=await r.json();const byId=new Map(remote.records.map(x=>[String(x.id),x]));state.records.forEach(x=>byId.set(String(x.id),x));state.records=[...byId.values()].sort((a,b)=>a.ts-b.ts);state.settings={...state.settings,...(remote.settings||{})};save();} $('dot').classList.add('ok');$('syncText').textContent='已同步';render();}catch(e){$('syncText').textContent='离线，已保存';}}
+$('kick').addEventListener('click',record);$('sync').addEventListener('click',()=>sync(true));$('pair').addEventListener('click',async()=>{let url='';try{const r=await fetch(location.origin+'/api/info');if(r.ok){const info=await r.json();url=info.url;}}catch(e){}if(!url&&token)url=location.origin+'/?token='+encodeURIComponent(token);if(!url)url=location.href;$('url').value=url;$('dialog').showModal()});$('copy').addEventListener('click',()=>navigator.clipboard?.writeText($('url').value));$('close').addEventListener('click',()=>$('dialog').close());
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');render();if(token)sync(false);
+</script>
+</body>
+</html>
