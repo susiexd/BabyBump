@@ -45,6 +45,66 @@ function saveState(s) {
   }
 }
 
+/* ── i18n 国际化 ── */
+const LOCALES_DIR = path.join(__dirname, "locales");
+let currentLocale = null;
+
+function loadLocale(lang) {
+  const file = path.join(LOCALES_DIR, `${lang}.json`);
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (e) {
+    return null;
+  }
+}
+
+function getLocale() {
+  if (currentLocale) return currentLocale;
+  const settings = loadState().settings;
+  const lang = settings.lang || app.getLocale().split("-")[0] || "zh";
+  currentLocale = loadLocale(lang) || loadLocale("zh") || {};
+  return currentLocale;
+}
+
+function t(key, params = {}) {
+  const locale = getLocale();
+  const keys = key.split(".");
+  let value = locale;
+  for (const k of keys) {
+    if (value && typeof value === "object") value = value[k];
+    else { value = undefined; break; }
+  }
+  if (value === undefined) return key;
+  if (typeof value !== "string") return key;
+  // 插值替换 {key}
+  return value.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? `{${name}}`);
+}
+
+function setLocale(lang) {
+  currentLocale = loadLocale(lang) || loadLocale("zh") || {};
+  const state = loadState();
+  state.settings.lang = lang;
+  saveState(state);
+  // 重建托盘菜单
+  if (tray) tray.setContextMenu(buildTrayMenu());
+  // 通知渲染进程语言已变更
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("locale:changed", { lang, locale: currentLocale });
+  }
+  if (miniWindow && !miniWindow.isDestroyed()) {
+    miniWindow.webContents.send("locale:changed", { lang, locale: currentLocale });
+  }
+}
+
+function getAvailableLocales() {
+  try {
+    const files = fs.readdirSync(LOCALES_DIR);
+    return files.filter(f => f.endsWith(".json")).map(f => f.replace(".json", ""));
+  } catch (e) {
+    return ["zh", "en"];
+  }
+}
+
 /* ── 手机端 PWA 同步服务：仅局域网可访问，使用持久化配对令牌 ── */
 const SYNC_PORT = 18765;
 let syncServer = null;
@@ -100,6 +160,11 @@ function startSyncServer() {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname.startsWith("/api/")) {
       if (url.pathname === "/api/info" && req.method === "GET") return jsonResponse(res, 200, syncInfo());
+      if (url.pathname.startsWith("/api/locale/") && req.method === "GET") {
+        const lang = url.pathname.split("/")[3] || "zh";
+        const locale = loadLocale(lang) || loadLocale("zh") || {};
+        return jsonResponse(res, 200, locale);
+      }
       if (token !== syncToken()) return jsonResponse(res, 401, { error: "配对码无效" });
       if (url.pathname === "/api/state" && req.method === "GET") return jsonResponse(res, 200, syncPayload(loadState()));
       if (url.pathname === "/api/state" && req.method === "POST") {
@@ -252,24 +317,24 @@ function todayCount() {
 function buildTrayMenu() {
   const isSpace = loadState().settings.shortcut === "space";
   const recordItem = {
-    label: "记录一次胎动",
+    label: t("tray.record"),
     click: () => recordFromOutside()
   };
   // 空格 = 应用内快捷键，未注册全局，托盘不显示加速键标签
   if (!isSpace) recordItem.accelerator = getShortcutLabel();
   return Menu.buildFromTemplate([
-    { label: "完整版", type: "radio", checked: getMode() === "full", click: () => switchToFull() },
-    { label: "迷你模式", type: "radio", checked: getMode() === "mini", click: () => switchToMini() },
+    { label: t("tray.fullMode"), type: "radio", checked: getMode() === "full", click: () => switchToFull() },
+    { label: t("tray.miniMode"), type: "radio", checked: getMode() === "mini", click: () => switchToMini() },
     { type: "separator" },
     recordItem,
-    { label: "开始晚间计数", click: () => { switchToFull(); mainWindow.webContents.send("action:start-session"); } },
+    { label: t("tray.startSession"), click: () => { switchToFull(); mainWindow.webContents.send("action:start-session"); } },
     { type: "separator" },
     {
-      label: "提醒设置",
+      label: t("tray.remindSettings"),
       click: () => switchToFull("settings")
     },
     { type: "separator" },
-    { label: "退出 BabyBump", click: () => { isQuitting = true; app.quit(); } }
+    { label: t("tray.quit"), click: () => { isQuitting = true; app.quit(); } }
   ]);
 }
 
@@ -277,7 +342,7 @@ function createTray() {
   const img = nativeImage.createFromPath(path.join(__dirname, "assets", "trayTemplate.png"));
   img.setTemplateImage(true);
   tray = new Tray(img);
-  tray.setToolTip("BabyBump · 胎动记录");
+  tray.setToolTip(t("app.title"));
   tray.setContextMenu(buildTrayMenu());
   tray.on("click", () => {
     if (getMode() === "mini") switchToFull(); else switchToMini();
@@ -374,8 +439,8 @@ function doRecord(src = "tray") {
   // 系统通知（业务结果导向，一行话）
   if (Notification.isSupported()) {
     const n = new Notification({
-      title: weight ? `已记录胎动 · ${fmtTime(now)}` : "已合并 · 1 分钟内连续胎动",
-      body: weight ? "点一下，宝宝的一天又多了一次记录" : "连续滚动按医学规则计为 1 次"
+      title: weight ? t("mini.recorded") + " · " + fmtTime(now) : t("mini.merged"),
+      body: weight ? "" : t("mini.mergedBody")
     });
     n.show();
   }
@@ -397,6 +462,9 @@ ipcMain.handle("app:info", () => ({
   dataFile: DATA_FILE()
 }));
 ipcMain.handle("sync:info", () => syncInfo());
+ipcMain.handle("locale:get", () => ({ lang: loadState().settings.lang || "zh", locale: getLocale() }));
+ipcMain.handle("locale:set", (_e, lang) => { setLocale(lang); return { lang, locale: getLocale() }; });
+ipcMain.handle("locale:list", () => getAvailableLocales());
 ipcMain.handle("mini:record", () => {
   const r = doRecord("mini");
   // 同步主窗口 UI

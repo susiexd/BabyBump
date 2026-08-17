@@ -14,6 +14,11 @@ const api = {
   switchMode: (mode) => ipcRenderer.invoke("app:switch-mode", mode),
   // 同步
   syncInfo: () => ipcRenderer.invoke("sync:info"),
+  // i18n
+  localeGet: () => ipcRenderer.invoke("locale:get"),
+  localeSet: (lang) => ipcRenderer.invoke("locale:set", lang),
+  localeList: () => ipcRenderer.invoke("locale:list"),
+  onLocaleChanged: (cb) => ipcRenderer.on("locale:changed", (_e, payload) => cb(payload)),
   onSyncChanged: (cb) => ipcRenderer.on("sync:changed", (_e, state) => cb(state)),
   onExternalRecord: (cb) => ipcRenderer.on("external:record", (_e, payload) => cb(payload)),
   onStartSession: (cb) => ipcRenderer.on("action:start-session", () => cb()),

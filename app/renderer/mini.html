@@ -102,21 +102,65 @@
 <body>
   <div class="mini">
     <div class="circle" id="circle">
-      <span class="dong">Dong</span>
+      <span class="dong" data-i18n="mini.dong">Dong</span>
       <span class="count" id="count">--</span>
       <span class="week" id="week"></span>
       <span class="ripple" id="ripple"></span>
     </div>
-    <button class="expand" id="expand" title="回到完整版">
+    <button class="expand" id="expand" data-i18n-title="mini.expand" title="回到完整版">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
     </button>
     <div class="corner-dot"></div>
   </div>
-  <div class="tooltip" id="tooltip">已记录胎动</div>
+  <div class="tooltip" id="tooltip" data-i18n="mini.recorded">已记录胎动</div>
 
 <script>
 "use strict";
 /* 迷你窗：点击记录 · 拖拽移动 · 右上角切回完整版 */
+
+/* ══════════════ i18n ══════════════ */
+let currentLang = "zh";
+let localeData = null;
+
+async function initI18n() {
+  if (window.babybump) {
+    const result = await window.babybump.localeGet();
+    currentLang = result.lang;
+    localeData = result.locale;
+  }
+}
+
+function t(key, params = {}) {
+  if (!localeData) return key;
+  const keys = key.split(".");
+  let value = localeData;
+  for (const k of keys) {
+    if (value && typeof value === "object") value = value[k];
+    else { value = undefined; break; }
+  }
+  if (value === undefined) return key;
+  if (typeof value !== "string") return key;
+  return value.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? `{${name}}`);
+}
+
+function applyTranslations() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    const value = t(key);
+    if (value !== key && el.children.length === 0) {
+      el.textContent = value;
+    }
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach(el => {
+    const key = el.getAttribute("data-i18n-title");
+    const value = t(key);
+    if (value !== key) {
+      el.setAttribute("title", value);
+    }
+  });
+}
+
+/* ── 拖拽（JS 实现：与点击兼容） ── */
 const circle = document.getElementById("circle");
 const countEl = document.getElementById("count");
 const weekEl = document.getElementById("week");
@@ -170,9 +214,9 @@ window.addEventListener("mouseup", async (e) => {
     try {
       const r = await window.babybump.miniRecord();
       countEl.textContent = r.todayCount + " 次";
-      showTooltip(r.weight === 1 ? "已记录 ✅" : "已合并 · 连续胎动");
+      showTooltip(r.weight === 1 ? t("mini.recorded") + " ✅" : t("mini.merged"));
     } catch (err) {
-      showTooltip("记录失败，请重试");
+      showTooltip(t("mini.recordFailed"));
     }
   }
 });
@@ -185,18 +229,20 @@ expandBtn.addEventListener("click", () => {
 /* ── 主进程回传 ── */
 window.babybump.onMiniResult(({ weight, todayCount }) => {
   countEl.textContent = todayCount + " 次";
-  showTooltip(weight === 1 ? "已记录 ✅" : "已合并 · 连续胎动");
+  showTooltip(weight === 1 ? t("mini.recorded") + " ✅" : t("mini.merged"));
 });
 
-window.babybump.onMiniInit(({ todayCount, weekText }) => {
+window.babybump.onMiniInit(async ({ todayCount, weekText }) => {
   countEl.textContent = todayCount + " 次";
   weekEl.textContent = weekText || "";
   // 首次显示引导
-  showTooltip("点击记录 · 拖动换位置");
+  showTooltip(t("mini.guide"));
 });
 
 /* ── 启动时同步 ── */
 (async () => {
+  await initI18n();
+  applyTranslations();
   const state = await window.babybump.load();
   const today = state.records.filter(r => isToday(r.ts) && r.weight > 0).length;
   countEl.textContent = today + " 次";
@@ -213,10 +259,10 @@ function weekTextOf(settings) {
   if (isNaN(due)) return "";
   const lmp = new Date(due); lmp.setDate(lmp.getDate() - 280);
   const days = Math.floor((Date.now() - lmp.getTime()) / 86400000);
-  if (days < 0) return "孕早期";
-  if (days > 294) return "已过预产期";
+  if (days < 0) return t("week.early");
+  if (days > 294) return t("week.overdue");
   const w = Math.floor(days / 7), d = days % 7;
-  return `孕 ${w} 周 + ${d} 天`;
+  return t("week.weeks", { weeks: w, days: d });
 }
 </script>
 </body>
