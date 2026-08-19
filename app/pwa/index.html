@@ -71,6 +71,10 @@ function t(key, params = {}) {
   return value.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? `{${name}}`);
 }
 
+function countUnit(n) {
+  return t(Number(n) === 1 ? 'pwa.countUnitOne' : 'pwa.countUnit');
+}
+
 function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
@@ -86,8 +90,8 @@ function validRecords(){return state.records.filter(r=>r.weight>0&&dayKey(r.ts)=
 function save(){localStorage.setItem(KEY,JSON.stringify(state));}
 function render(){
   const recs=validRecords();
-  $('count').innerHTML=`${recs.length}<small>${t('pwa.countUnit')}</small>`;
-  $('today').innerHTML=`${recs.length} <span>${t('pwa.countUnit')}</span>`;
+  $('count').innerHTML=`${recs.length}<small>${countUnit(recs.length)}</small>`;
+  $('today').innerHTML=`${recs.length} <span>${countUnit(recs.length)}</span>`;
   $('last').textContent=recs.length?new Date(recs[recs.length-1].ts).toLocaleTimeString(currentLang==='zh'?'zh-CN':'en-US',{hour:'2-digit',minute:'2-digit'}):'--:--';
   $('list').innerHTML=recs.length?recs.slice().reverse().map(r=>`<div class="record"><span>${new Date(r.ts).toLocaleTimeString(currentLang==='zh'?'zh-CN':'en-US',{hour:'2-digit',minute:'2-digit'})}</span><span>${r.src==='mobile'?t('pwa.mobileRecord'):t('pwa.syncedRecord')}</span></div>`).join(''):`<div class="record"><span>${t('pwa.emptyTimeline')}</span><span>${t('pwa.emptyHint')}</span></div>`;
 }

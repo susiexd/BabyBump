@@ -1,4 +1,10 @@
 {
+  "common": {
+    "countUnit": "次",
+    "countUnitOne": "次",
+    "countWithUnit": "{count} 次",
+    "countWithUnitOne": "{count} 次"
+  },
   "app": {
     "title": "BabyBump · 胎动记录",
     "subtitle": "胎动记录",
@@ -13,6 +19,11 @@
     "title": "今天",
     "kickLabel": "感受到 \"dong\" 就点",
     "kickHint": "托盘常驻 · 全局快捷键 {shortcut} · 关窗不退出，随时可记",
+    "sourceManual": "随手记录",
+    "sourceSession": "会话计数",
+    "gapMinutes": "距上次 {minutes} 分",
+    "hourTip": "{hour}:00 · {count} 次",
+    "baselineRatio": "{today} / {base} 次",
     "timelineTitle": "今日时间线",
     "timelineHint": "共 {count} 条",
     "emptyTimeline": "还没有记录。\n现在去点一下中间的按钮吧。",
@@ -21,6 +32,7 @@
     "sessionInProgress": "进行中",
     "sessionCompleted": "✅ 已达标",
     "sessionCount": "已计 {count} 次",
+    "sessionCountOne": "已计 {count} 次",
     "sessionElapsed": "经过 {time}",
     "sessionGoal": "目标 {goal} 次 / 2 小时",
     "sessionStart": "开始晚间计数（{time} 起）",
@@ -66,7 +78,8 @@
     "anomalyOn": "异常模式提醒已开启",
     "anomalyOff": "异常提醒已关闭",
     "exported": "CSV 已导出",
-    "synced": "手机记录已同步"
+    "synced": "手机记录已同步",
+    "trayRecord": "托盘记录 · {time}"
   },
   "settings": {
     "title": "设置",
@@ -88,6 +101,8 @@
     "merge0": "不合并",
     "goal": "计数目标",
     "goalDesc": "定时会话的默认目标次数",
+    "goalTimes": "{count} 次",
+    "goalTimesOne": "{count} 次",
     "remind": "提醒",
     "dailyRemind": "每日计数提醒",
     "dailyRemindDesc": "每天定时提醒\"该数胎动了\"",
@@ -157,6 +172,7 @@
     "offline": "离线，已保存",
     "recordBtn": "记录胎动",
     "countUnit": "次",
+    "countUnitOne": "次",
     "hint": "感受到胎动就点一下<br>1 分钟内连续胎动会自动合并",
     "todayCount": "今日有效记录",
     "lastRecord": "最近一次",

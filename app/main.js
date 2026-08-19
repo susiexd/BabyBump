@@ -48,6 +48,7 @@ function saveState(s) {
 /* ── i18n 国际化 ── */
 const LOCALES_DIR = path.join(__dirname, "locales");
 let currentLocale = null;
+let currentLang = null;
 
 function loadLocale(lang) {
   const file = path.join(LOCALES_DIR, `${lang}.json`);
@@ -58,11 +59,17 @@ function loadLocale(lang) {
   }
 }
 
-function getLocale() {
-  if (currentLocale) return currentLocale;
+function resolveLang() {
   const settings = loadState().settings;
-  const lang = settings.lang || app.getLocale().split("-")[0] || "zh";
-  currentLocale = loadLocale(lang) || loadLocale("zh") || {};
+  return settings.lang || (app.isReady() ? app.getLocale() : "").split("-")[0] || "zh";
+}
+
+function getLocale() {
+  const lang = resolveLang();
+  if (!currentLocale || currentLang !== lang) {
+    currentLang = lang;
+    currentLocale = loadLocale(lang) || loadLocale("zh") || {};
+  }
   return currentLocale;
 }
 
@@ -81,6 +88,7 @@ function t(key, params = {}) {
 }
 
 function setLocale(lang) {
+  currentLang = lang;
   currentLocale = loadLocale(lang) || loadLocale("zh") || {};
   const state = loadState();
   state.settings.lang = lang;
@@ -281,6 +289,7 @@ function createMiniWindow() {
   miniWindow = new BrowserWindow(opts);
   miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"));
   miniWindow.setAlwaysOnTop(true, "floating");
+  miniWindow.webContents.on("did-finish-load", sendMiniInit);
   // 拖拽后记住位置（节流保存）
   miniWindow.on("move", () => {
     if (miniPosSaveTimer) return;
@@ -296,16 +305,21 @@ function createMiniWindow() {
   miniWindow.on("closed", () => { miniWindow = null; });
 }
 
+function sendMiniInit() {
+  if (!miniWindow || miniWindow.isDestroyed()) return;
+  miniWindow.webContents.send("mini:init", {
+    todayCount: todayCount(),
+    lang: resolveLang(),
+    locale: getLocale()
+  });
+}
+
 function showMini() {
   setMode("mini");
   if (!miniWindow) createMiniWindow();
   if (mainWindow) mainWindow.hide();
   miniWindow.show();
-  // 同步今日计数 + 孕周
-  miniWindow.webContents.send("mini:init", {
-    todayCount: todayCount(),
-    weekText: weekTextOf(loadState().settings)
-  });
+  if (!miniWindow.webContents.isLoading()) sendMiniInit();
 }
 
 function todayCount() {
@@ -462,7 +476,7 @@ ipcMain.handle("app:info", () => ({
   dataFile: DATA_FILE()
 }));
 ipcMain.handle("sync:info", () => syncInfo());
-ipcMain.handle("locale:get", () => ({ lang: loadState().settings.lang || "zh", locale: getLocale() }));
+ipcMain.handle("locale:get", () => ({ lang: resolveLang(), locale: getLocale() }));
 ipcMain.handle("locale:set", (_e, lang) => { setLocale(lang); return { lang, locale: getLocale() }; });
 ipcMain.handle("locale:list", () => getAvailableLocales());
 ipcMain.handle("mini:record", () => {
@@ -551,7 +565,7 @@ function weekTextOf(settings) {
   const lmp = new Date(due);
   lmp.setDate(lmp.getDate() - 280); // 预产期 = 末次月经 + 280 天
   const days = Math.floor((Date.now() - lmp.getTime()) / 86400000);
-  if (days < 0) return "孕早期";
-  if (days > 294) return "已过预产期";
-  return `孕 ${Math.floor(days / 7)} 周 + ${days % 7} 天`;
+  if (days < 0) return t("week.early");
+  if (days > 294) return t("week.overdue");
+  return t("week.weeks", { weeks: Math.floor(days / 7), days: days % 7 });
 }

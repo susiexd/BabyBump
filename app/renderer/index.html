@@ -287,7 +287,7 @@
     <button class="nav-item" data-view="settings"><span class="nicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></svg></span><span data-i18n="nav.settings">设置</span></button>
     <div class="sidebar-spacer"></div>
     <div class="week-badge" id="week-badge"></div>
-    <div class="disclaimer-foot" data-i18n="disclaimer.footer">BabyBump 仅做记录与趋势提示，<b>不构成医疗诊断</b>。胎动明显减少或消失时，请立即联系产科医生。</div>
+    <div class="disclaimer-foot" data-i18n="disclaimer.footer">BabyBump 仅做记录与趋势提示，不构成医疗诊断。胎动明显减少或消失时，请立即联系产科医生。</div>
   </aside>
 
   <!-- ═══ Main ═══ -->
@@ -321,12 +321,12 @@
           </div>
           <div class="sc-progress"><div id="session-bar" style="width:0%"></div></div>
           <div class="sc-stats">
-            <span data-i18n="today.sessionCount">已计 <b id="session-count">0</b> 次</span>
-            <span data-i18n="today.sessionElapsed">经过 <b id="session-elapsed">--:--</b></span>
-            <span data-i18n="today.sessionGoal">目标 <b>10 次 / 2 小时</b></span>
+            <span id="session-count-label">已计 <b>0</b> 次</span>
+            <span id="session-elapsed-label">经过 <b>--:--</b></span>
+            <span id="session-goal-label">目标 <b>10</b> 次 / 2 小时</span>
           </div>
           <div class="sc-actions">
-            <button class="btn primary" id="session-start" style="flex:1" data-i18n="today.sessionStart">开始晚间计数（20:00 起）</button>
+            <button class="btn primary" id="session-start" style="flex:1">开始晚间计数（20:00 起）</button>
             <button class="btn ghost" id="session-stop" style="display:none" data-i18n="today.sessionStop">结束</button>
           </div>
           <div class="sc-note" data-i18n="today.sessionNote">按指南建议：选宝宝活跃时段，专注感受；连续滚动 1 分钟内算 1 次。达到 10 次即完成今日计数。</div>
@@ -470,14 +470,33 @@ function t(key, params = {}) {
   return value.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? `{${name}}`);
 }
 
+function tCount(oneKey, manyKey, count, extra = {}) {
+  const n = Number(count);
+  return t(n === 1 ? oneKey : manyKey, { count, ...extra });
+}
+
+function countUnit(n) {
+  return tCount("common.countUnitOne", "common.countUnit", n);
+}
+
+function countWithUnit(n) {
+  return tCount("common.countWithUnitOne", "common.countWithUnit", n);
+}
+
+function dateLocale() {
+  return currentLang === "zh" ? "zh-CN" : "en-US";
+}
+
 async function changeLanguage(lang) {
   if (window.babybump) {
     const result = await window.babybump.localeSet(lang);
     currentLang = result.lang;
     localeData = result.locale;
+    document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
     applyTranslations();
     renderAll();
     updateSettingsUI();
+    updateKickHint();
   }
 }
 
@@ -485,19 +504,10 @@ function applyTranslations() {
   document.querySelectorAll("[data-i18n]").forEach(el => {
     const key = el.getAttribute("data-i18n");
     const value = t(key);
-    if (value !== key) {
-      // 保留子元素（如 <b>, <kbd>），只替换文本节点
-      if (el.children.length === 0) {
-        el.textContent = value;
-      } else {
-        // 有子元素时，更新文本内容但保留子元素
-        const children = Array.from(el.childNodes);
-        children.forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            node.textContent = value;
-          }
-        });
-      }
+    // 有子元素的节点（如 <b>/<kbd> 动态值）留给各自的 render 更新，
+    // 不能把整段译文写进每个文本节点，否则会叠成两段。
+    if (value !== key && el.children.length === 0) {
+      el.textContent = value;
     }
   });
 }
@@ -520,7 +530,11 @@ const set = (k, v) => { settings[k] = v; saveState(state); };
 
 /* ══════════════ Date helpers ══════════════ */
 const fmtTime = ts => new Date(ts).toTimeString().slice(0,5);
-const fmtDate = ts => { const d = new Date(ts); return `${d.getMonth()+1}月${d.getDate()}日`; };
+const fmtDate = ts => new Date(ts).toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
+function renderTodayDate() {
+  document.getElementById("today-date").textContent =
+    new Date().toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+}
 const dayKey = ts => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
 const todayKey = () => dayKey(Date.now());
 const isToday = ts => dayKey(ts) === todayKey();
@@ -581,12 +595,12 @@ function anomalyInfo() {
 }
 
 /* ══════════════ Rendering: Today ══════════════ */
-function renderAll() { renderToday(); renderHistory(); renderSettings(); renderWeek(); }
+function renderAll() { renderTodayDate(); renderToday(); renderHistory(); renderSettings(); renderWeek(); }
 
 function renderToday() {
   const recs = todayRecords().filter(r => r.weight > 0);
   const total = recs.reduce((s,r) => s + r.weight, 0);
-  document.getElementById("kb-count").innerHTML = total + "<small> 次</small>";
+  document.getElementById("kb-count").innerHTML = total + `<small> ${countUnit(total)}</small>`;
 
   /* status chips */
   const base = baseline();
@@ -633,8 +647,9 @@ function renderToday() {
   } else {
     tl.innerHTML = recs.slice().reverse().map((r, i) => {
       const prev = recs[recs.length - 1 - i - 1];
-      const gap = prev ? `距上次 ${((r.ts - prev.ts)/60000).toFixed(0)} 分` : "";
-      return `<li><span class="t-time">${fmtTime(r.ts)}</span><span class="t-dot"></span><span>${r.src === "session" ? "会话计数" : "随手记录"}</span><span class="t-gap">${gap}</span></li>`;
+      const gap = prev ? t("today.gapMinutes", { minutes: ((r.ts - prev.ts)/60000).toFixed(0) }) : "";
+      const src = r.src === "session" ? t("today.sourceSession") : t("today.sourceManual");
+      return `<li><span class="t-time">${fmtTime(r.ts)}</span><span class="t-dot"></span><span>${src}</span><span class="t-gap">${gap}</span></li>`;
     }).join("");
   }
 
@@ -646,7 +661,7 @@ function renderToday() {
   const curHour = new Date().getHours();
   hbars.innerHTML = hourCounts.map((n, h) => {
     const cls = n > 0 ? "bar filled" : "bar";
-    return `<div class="${cls}${h === curHour && n > 0 ? " active" : ""}" style="height:${Math.max(4, Math.round(n/max*100))}%" data-tip="${h}:00 · ${n} 次"></div>`;
+    return `<div class="${cls}${h === curHour && n > 0 ? " active" : ""}" style="height:${Math.max(4, Math.round(n/max*100))}%" data-tip="${t("today.hourTip", { hour: h, count: n })}"></div>`;
   }).join("");
 
   /* baseline box */
@@ -660,7 +675,7 @@ function renderToday() {
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
         <span style="font-size:12px;color:var(--ink-2)">${t("today.baselineCompare")}</span>
-        <span style="font-weight:700;font-variant-numeric:tabular-nums">${today} / ${base} 次</span>
+        <span style="font-weight:700;font-variant-numeric:tabular-nums">${today} / ${countWithUnit(base)}</span>
       </div>
       <div class="sc-progress" style="margin:0"><div style="width:${Math.min(100, pct)}%"></div></div>
       <div style="font-size:11.5px;color:var(--ink-3);margin-top:8px">${statusText}</div>`;
@@ -675,23 +690,28 @@ let sessionTimer = null;
 function renderSession() {
   const meta = document.getElementById("session-meta");
   const bar = document.getElementById("session-bar");
-  const cnt = document.getElementById("session-count");
-  const ela = document.getElementById("session-elapsed");
+  const cnt = document.getElementById("session-count-label");
+  const ela = document.getElementById("session-elapsed-label");
+  const goalEl = document.getElementById("session-goal-label");
   const startBtn = document.getElementById("session-start");
   const stopBtn = document.getElementById("session-stop");
+  const goal = parseInt(settings.goal || 10, 10);
+  const remindTime = settings.remindTime || "20:00";
+  const count = session ? session.count : 0;
+  const elapsed = session ? fmtDur(Math.floor((Date.now() - session.start) / 1000)) : "--:--";
+
+  cnt.innerHTML = tCount("today.sessionCountOne", "today.sessionCount", count).replace(String(count), `<b>${count}</b>`);
+  ela.innerHTML = t("today.sessionElapsed", { time: `<b>${elapsed}</b>` });
+  goalEl.innerHTML = t("today.sessionGoal", { goal: `<b>${goal}</b>` });
+  startBtn.textContent = t("today.sessionStart", { time: remindTime });
 
   if (!session) {
     meta.textContent = t("today.sessionNotStarted");
-    cnt.textContent = "0"; ela.textContent = "--:--";
     bar.style.width = "0%";
     startBtn.style.display = ""; stopBtn.style.display = "none";
     return;
   }
-  const count = session.count;
-  const goal = parseInt(settings.goal || 10, 10);
-  const elapsed = Math.floor((Date.now() - session.start) / 1000);
   meta.textContent = t("today.sessionInProgress");
-  cnt.textContent = count; ela.textContent = fmtDur(elapsed);
   bar.style.width = Math.min(100, count / goal * 100) + "%";
   startBtn.style.display = "none"; stopBtn.style.display = "";
   if (count >= goal) {
@@ -745,7 +765,7 @@ function renderHistory() {
       const cls = d.n === 0 ? "" : (base && d.n < base * 0.5 ? "low" : "normal");
       const pct = base ? Math.min(100, Math.round(d.n / base * 100)) : 0;
       return `<tr class="${cls}"><td>${fmtDate(d.ts)}${dayKey(d.ts) === todayKey() ? " · " + t("history.today") : ""}</td>
-        <td>${d.n}${d.n === 0 ? "" : " 次"}</td>
+        <td>${d.n === 0 ? "0" : countWithUnit(d.n)}</td>
         <td class="bar-cell"><div class="mini-bar"><div style="width:${pct}%"></div></div></td></tr>`;
     }).join("");
 }
@@ -791,7 +811,11 @@ function drawLine(days) {
 function renderSettings() {
   document.getElementById("set-shortcut").value = settings.shortcut || "space";
   document.getElementById("set-merge").value = settings.mergeSec == null ? "60" : String(settings.mergeSec);
-  document.getElementById("set-goal").value = settings.goal || "10";
+  const goalSelect = document.getElementById("set-goal");
+  goalSelect.querySelectorAll("option").forEach(opt => {
+    opt.textContent = tCount("settings.goalTimesOne", "settings.goalTimes", opt.value);
+  });
+  goalSelect.value = settings.goal || "10";
   document.getElementById("set-remind").classList.toggle("on", settings.remind !== false);
   document.getElementById("set-remind-time").value = settings.remindTime || "20:00";
   document.getElementById("set-anomaly").classList.toggle("on", settings.anomaly !== false);
@@ -914,7 +938,7 @@ document.getElementById("set-anomaly").addEventListener("click", e => {
 document.getElementById("btn-export").addEventListener("click", () => {
   const rows = [["日期","时间","来源"]];
   state.records.slice().sort((a,b) => a.ts - b.ts).forEach(r => {
-    rows.push([fmtDate(r.ts), fmtTime(r.ts), r.src === "session" ? "会话" : "随手"]);
+    rows.push([fmtDate(r.ts), fmtTime(r.ts), r.src === "session" ? t("today.sourceSession") : t("today.sourceManual")]);
   });
   const csv = "\ufeff" + rows.map(r => r.join(",")).join("\n");
   const a = document.createElement("a");
@@ -938,9 +962,6 @@ function toast(msg) {
 }
 
 /* ══════════════ Init ══════════════ */
-document.getElementById("today-date").textContent =
-  new Date().toLocaleDateString(currentLang === "zh" ? "zh-CN" : "en-US", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
-
 /* 从主进程加载持久化数据（替代 localStorage） */
 async function init() {
   await initI18n();
@@ -966,14 +987,14 @@ async function init() {
       renderAll();
       const btn = document.getElementById("kick-btn");
       btn.classList.remove("pulse"); void btn.offsetWidth; btn.classList.add("pulse");
-      toast("托盘记录 · " + fmtTime(ts));
+      toast(t("toast.trayRecord", { time: fmtTime(ts) }));
     });
     window.babybump.onStartSession(() => {
       if (!session) {
         session = { start: Date.now(), count: 0 };
         sessionTimer = setInterval(renderSession, 1000);
         renderSession();
-        toast("晚间计数已开始 · 感受到胎动就点中间按钮");
+        toast(t("toast.sessionStart"));
       }
     });
     window.babybump.onNav((v) => {
@@ -988,13 +1009,21 @@ async function init() {
       state = next;
       settings = state.settings || {};
       renderAll();
-      toast("手机记录已同步");
+      toast(t("toast.synced"));
     });
-    /* 快捷键提示显示真实全局快捷键 */
-    const sc = await window.babybump.shortcut();
-    const hint = document.querySelector(".kick-hint");
-    if (hint && sc) hint.innerHTML = `托盘常驻 · 全局快捷键 <kbd>${sc}</kbd> · 关窗不退出，随时可记`;
+    await updateKickHint();
   }
+}
+
+let lastShortcut = "Space";
+async function updateKickHint() {
+  const hint = document.querySelector(".kick-hint");
+  if (!hint) return;
+  if (window.babybump) {
+    const sc = await window.babybump.shortcut();
+    if (sc) lastShortcut = sc;
+  }
+  hint.innerHTML = t("today.kickHint", { shortcut: `<kbd>${lastShortcut}</kbd>` });
 }
 init();
 </script>

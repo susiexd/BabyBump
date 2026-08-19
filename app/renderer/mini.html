@@ -143,6 +143,17 @@ function t(key, params = {}) {
   return value.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? `{${name}}`);
 }
 
+function countWithUnit(n) {
+  return t(Number(n) === 1 ? "common.countWithUnitOne" : "common.countWithUnit", { count: n });
+}
+
+function applyLocale(lang, locale) {
+  if (lang) currentLang = lang;
+  if (locale) localeData = locale;
+  document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+  applyTranslations();
+}
+
 function applyTranslations() {
   document.querySelectorAll("[data-i18n]").forEach(el => {
     const key = el.getAttribute("data-i18n");
@@ -213,7 +224,7 @@ window.addEventListener("mouseup", async (e) => {
     ripple.classList.remove("go"); void ripple.offsetWidth; ripple.classList.add("go");
     try {
       const r = await window.babybump.miniRecord();
-      countEl.textContent = r.todayCount + " 次";
+      setTodayCount(r.todayCount);
       showTooltip(r.weight === 1 ? t("mini.recorded") + " ✅" : t("mini.merged"));
     } catch (err) {
       showTooltip(t("mini.recordFailed"));
@@ -228,25 +239,42 @@ expandBtn.addEventListener("click", () => {
 
 /* ── 主进程回传 ── */
 window.babybump.onMiniResult(({ weight, todayCount }) => {
-  countEl.textContent = todayCount + " 次";
+  setTodayCount(todayCount);
   showTooltip(weight === 1 ? t("mini.recorded") + " ✅" : t("mini.merged"));
 });
 
-window.babybump.onMiniInit(async ({ todayCount, weekText }) => {
-  countEl.textContent = todayCount + " 次";
-  weekEl.textContent = weekText || "";
-  // 首次显示引导
+window.babybump.onMiniInit(async ({ todayCount, lang, locale }) => {
+  if (locale) applyLocale(lang, locale);
+  else if (!localeData) await initI18n();
+  setTodayCount(todayCount);
+  const state = await window.babybump.load();
+  weekEl.textContent = weekTextOf(state.settings) || "";
   showTooltip(t("mini.guide"));
 });
+
+function setTodayCount(n) {
+  countEl.textContent = countWithUnit(n);
+}
+
+async function refreshFromState() {
+  if (!window.babybump) return;
+  const state = await window.babybump.load();
+  const today = state.records.filter(r => isToday(r.ts) && r.weight > 0).length;
+  setTodayCount(today);
+  weekEl.textContent = weekTextOf(state.settings) || "";
+}
 
 /* ── 启动时同步 ── */
 (async () => {
   await initI18n();
   applyTranslations();
-  const state = await window.babybump.load();
-  const today = state.records.filter(r => isToday(r.ts) && r.weight > 0).length;
-  countEl.textContent = today + " 次";
-  weekEl.textContent = weekTextOf(state.settings) || "";
+  await refreshFromState();
+  if (window.babybump && window.babybump.onLocaleChanged) {
+    window.babybump.onLocaleChanged(({ lang, locale }) => {
+      applyLocale(lang, locale);
+      refreshFromState();
+    });
+  }
 })();
 
 function isToday(ts) {
