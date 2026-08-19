@@ -19,6 +19,10 @@ const api = {
   localeSet: (lang) => ipcRenderer.invoke("locale:set", lang),
   localeList: () => ipcRenderer.invoke("locale:list"),
   onLocaleChanged: (cb) => ipcRenderer.on("locale:changed", (_e, payload) => cb(payload)),
+  // 主题
+  getTheme: () => ipcRenderer.invoke("theme:get"),
+  setTheme: (payload) => ipcRenderer.invoke("theme:set", payload),
+  onThemeChanged: (cb) => ipcRenderer.on("theme:changed", (_e, payload) => cb(payload)),
   onSyncChanged: (cb) => ipcRenderer.on("sync:changed", (_e, state) => cb(state)),
   onExternalRecord: (cb) => ipcRenderer.on("external:record", (_e, payload) => cb(payload)),
   onStartSession: (cb) => ipcRenderer.on("action:start-session", () => cb()),

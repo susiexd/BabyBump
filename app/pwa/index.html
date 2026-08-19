@@ -8,7 +8,10 @@
   <link rel="manifest" href="manifest.json">
   <title>BabyBump · 手机记录</title>
   <style>
-    :root { --bg:#faf7f2; --surface:#fff; --ink:#2b2420; --muted:#84776d; --accent:#e07a5f; --soft:#fbe9e2; --ok:#6a994e; --line:#eadfd5; }
+    :root { --bg:#faf7f2; --surface:#fff; --ink:#2b2420; --muted:#84776d; --accent:#e07a5f; --accent-deep:color-mix(in srgb,var(--accent) 86%,#000); --soft:#fbe9e2; --ok:#6a994e; --line:#eadfd5; }
+    html[data-theme="dark"] { --bg:#1a1715; --surface:#24201d; --ink:#f4ede7; --muted:#8f837b; --soft:#3a2c28; --ok:#8fbf6a; --line:#3c342f; color-scheme:dark; }
+    html[data-theme="blue"] { --bg:#10172a; --surface:#182238; --ink:#e8eef8; --muted:#6e7c99; --soft:#243052; --ok:#7bc67a; --line:#2a3654; color-scheme:dark; }
+    html[data-theme="classic"] { --bg:#111; --surface:#1c1c1c; --ink:#f2f2f2; --muted:#808080; --soft:#2a2a2a; --ok:#7cb86a; --line:#2e2e2e; color-scheme:dark; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
     .app { max-width:520px; min-height:100vh; margin:auto; padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; }
@@ -16,7 +19,7 @@
     h1 { margin:0; font-size:24px; letter-spacing:.02em; } h1 small { display:block; color:var(--muted); font-size:12px; font-weight:500; margin-top:2px; }
     .sync-dot { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; } .dot { width:8px; height:8px; border-radius:50%; background:#c9bdb2; } .dot.ok { background:var(--ok); }
     .hero { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:410px; }
-    .kick { width:min(72vw,280px); height:min(72vw,280px); max-width:280px; max-height:280px; border:0; border-radius:50%; color:white; background:radial-gradient(circle at 32% 25%,#f2a088,var(--accent) 58%,#d96f53); box-shadow:0 16px 38px rgba(224,122,95,.3),inset 0 2px rgba(255,255,255,.3); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:transform .1s; -webkit-tap-highlight-color:transparent; }
+    .kick { width:min(72vw,280px); height:min(72vw,280px); max-width:280px; max-height:280px; border:0; border-radius:50%; color:white; background:radial-gradient(circle at 32% 25%,color-mix(in srgb,var(--accent) 72%,#fff),var(--accent) 58%,var(--accent-deep)); box-shadow:0 16px 38px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 2px rgba(255,255,255,.3); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; transition:transform .1s; -webkit-tap-highlight-color:transparent; }
     .kick:active { transform:scale(.95); } .count { font-size:64px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; } .count small { font-size:18px; font-weight:600; margin-left:4px; }
     .kick-label { margin-top:14px; font-size:18px; font-weight:650; } .hint { color:var(--muted); font-size:13px; margin-top:18px; text-align:center; }
     .cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .card { padding:14px; border:1px solid var(--line); border-radius:14px; background:var(--surface); } .label { color:var(--muted); font-size:12px; } .value { margin-top:3px; font-size:21px; font-weight:750; font-variant-numeric:tabular-nums; }
@@ -85,6 +88,18 @@ function applyTranslations() {
   });
 }
 
+function applyThemeFromSettings() {
+  const pref = (state.settings && state.settings.theme) || 'light';
+  const accent = (state.settings && state.settings.accent) || '#E07A5F';
+  const resolved = pref === 'system'
+    ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : pref;
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.style.setProperty('--accent', accent);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', accent);
+}
+
 const $=id=>document.getElementById(id); const dayKey=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`}; const todayKey=()=>dayKey(Date.now());
 function validRecords(){return state.records.filter(r=>r.weight>0&&dayKey(r.ts)===todayKey()).sort((a,b)=>a.ts-b.ts)}
 function save(){localStorage.setItem(KEY,JSON.stringify(state));}
@@ -111,7 +126,7 @@ async function sync(push=true){
       state.records=[...byId.values()].sort((a,b)=>a.ts-b.ts);
       state.settings={...state.settings,...(remote.settings||{})};save();
     }
-    $('dot').classList.add('ok');$('syncText').textContent=t('pwa.synced');render();
+    $('dot').classList.add('ok');$('syncText').textContent=t('pwa.synced');applyThemeFromSettings();render();
   }catch(e){$('syncText').textContent=t('pwa.offline');}
 }
 $('kick').addEventListener('click',record);$('sync').addEventListener('click',()=>sync(true));$('pair').addEventListener('click',async()=>{let url='';try{const r=await fetch(location.origin+'/api/info');if(r.ok){const info=await r.json();url=info.url;}}catch(e){}if(!url&&token)url=location.origin+'/?token='+encodeURIComponent(token);if(!url)url=location.href;$('url').value=url;$('dialog').showModal()});$('copy').addEventListener('click',()=>navigator.clipboard?.writeText($('url').value));$('close').addEventListener('click',()=>$('dialog').close());
@@ -119,6 +134,7 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 (async()=>{
   await initI18n();
   applyTranslations();
+  applyThemeFromSettings();
   render();
   if(token)sync(false);
 })();

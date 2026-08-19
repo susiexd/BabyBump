@@ -5,7 +5,12 @@
 <style>
   :root {
     --accent: #E07A5F;
-    --accent-deep: #d96f53;
+    --accent-deep: color-mix(in srgb, var(--accent) 86%, #000);
+  }
+  html[data-theme="dark"],
+  html[data-theme="blue"],
+  html[data-theme="classic"] {
+    color-scheme: dark;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
   html, body {
@@ -21,28 +26,63 @@
   .circle {
     width: 96px; height: 96px;
     border-radius: 50%;
-    background: radial-gradient(circle at 32% 28%, #F09A80, var(--accent) 55%, var(--accent-deep));
-    box-shadow: 0 6px 20px rgba(224, 122, 95, .45), inset 0 1px 0 rgba(255,255,255,.35);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background-color: var(--accent);
+    background-image: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent) 72%, #fff), var(--accent) 55%, var(--accent-deep));
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 45%, transparent), inset 0 1px 0 rgba(255,255,255,.35);
+    display: grid; place-items: center;
     color: #fff;
     cursor: pointer;
-    transition: transform .08s ease, box-shadow .15s ease;
+    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
     position: relative;
     touch-action: none;
   }
-  .circle:active { transform: scale(.94); }
-  .circle.dragging { transform: scale(1.04); box-shadow: 0 10px 28px rgba(224,122,95,.55); }
-  .circle .dong {
-    font-size: 25px; font-weight: 800; letter-spacing: .04em;
-    line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.18);
+  .circle::after {
+    content: "";
+    position: absolute; inset: 3px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.0);
+    pointer-events: none;
+    transition: box-shadow .18s ease;
   }
+  .circle:hover {
+    transform: scale(1.07);
+    filter: brightness(1.07);
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 52%, transparent), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+  .circle:hover::after {
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.42);
+  }
+  .circle:active,
+  .circle:hover:active { transform: scale(.94); filter: brightness(1); }
+  .circle.dragging,
+  .circle.dragging:hover {
+    transform: scale(1.04); filter: none;
+    box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .circle .stack {
+    display: flex; flex-direction: column; align-items: center;
+    transform: translateY(-3px);
+  }
+  .circle .hero {
+    position: relative;
+    width: 40px; height: 40px;
+  }
+  .circle .mark {
+    display: block; width: 40px; height: 40px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.18));
+  }
+  .circle .mark svg { width: 40px; height: 40px; display: block; }
   .circle .count {
-    font-size: 12px; font-weight: 600; opacity: .92;
-    margin-top: 4px; font-variant-numeric: tabular-nums;
+    position: absolute; left: calc(100% - 3px); top: 7px;
+    font-size: 11px; font-weight: 800; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(0,0,0,.22);
   }
   .circle .week {
-    font-size: 9.5px; font-weight: 500; opacity: .85;
-    margin-top: 1px; font-variant-numeric: tabular-nums;
+    margin-top: 2px; max-width: 78px;
+    font-size: 8px; font-weight: 500; opacity: .88;
+    text-align: center; font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   /* 点击脉冲 */
   .pulse { animation: pulse .45s ease; }
@@ -102,9 +142,15 @@
 <body>
   <div class="mini">
     <div class="circle" id="circle">
-      <span class="dong" data-i18n="mini.dong">Dong</span>
-      <span class="count" id="count">--</span>
-      <span class="week" id="week"></span>
+      <div class="stack">
+        <div class="hero">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="4 3.2 16 18.2" fill="currentColor"><path d="M12 21C8 17 4.5 14 4.5 9.8A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.2C19.5 14 16 17 12 21Z"/></svg>
+          </span>
+          <span class="count" id="count">--</span>
+        </div>
+        <span class="week" id="week"></span>
+      </div>
       <span class="ripple" id="ripple"></span>
     </div>
     <button class="expand" id="expand" data-i18n-title="mini.expand" title="回到完整版">
@@ -117,6 +163,98 @@
 <script>
 "use strict";
 /* 迷你窗：点击记录 · 拖拽移动 · 右上角切回完整版 */
+
+/* ══════════════ theme ══════════════ */
+const DEFAULT_THEME = "light";
+const DEFAULT_ACCENT = "#E07A5F";
+const THEME_PRESETS = ["system", "light", "dark", "blue", "classic"];
+
+function normalizeHex(hex) {
+  if (typeof hex !== "string") return DEFAULT_ACCENT;
+  let value = hex.trim();
+  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+    value = "#" + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
+  }
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : DEFAULT_ACCENT;
+}
+
+function hexToRgb(hex) {
+  const value = normalizeHex(hex).slice(1);
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16)
+  };
+}
+
+function rgbToHsl({ r, g, b }) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return { h: h / 6, s, l };
+}
+
+function hslToHex(h, s, l) {
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  const to = (n) => Math.round(n * 255).toString(16).padStart(2, "0");
+  return ("#" + to(r) + to(g) + to(b)).toUpperCase();
+}
+
+function usableAccent(hex) {
+  const { h, s, l } = rgbToHsl(hexToRgb(hex));
+  if (l > 0.72 || s < 0.16) return hslToHex(h, Math.max(s, 0.38), 0.50);
+  return normalizeHex(hex);
+}
+
+function resolveTheme(pref) {
+  if (pref === "system") {
+    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return THEME_PRESETS.includes(pref) ? pref : DEFAULT_THEME;
+}
+
+function applyTheme({ theme, accent, resolved } = {}) {
+  const pref = THEME_PRESETS.includes(theme) ? theme : DEFAULT_THEME;
+  const color = usableAccent(accent || DEFAULT_ACCENT);
+  document.documentElement.dataset.theme = resolved || resolveTheme(pref);
+  document.documentElement.style.setProperty("--accent", color);
+}
+
+function themeFromSearch() {
+  const p = new URLSearchParams(location.search);
+  const raw = p.get("accent") || DEFAULT_ACCENT;
+  return {
+    theme: p.get("theme") || DEFAULT_THEME,
+    accent: raw.startsWith("#") ? raw : `#${raw}`
+  };
+}
+
+(function bootTheme() {
+  applyTheme(themeFromSearch());
+})();
 
 /* ══════════════ i18n ══════════════ */
 let currentLang = "zh";
@@ -243,17 +381,33 @@ window.babybump.onMiniResult(({ weight, todayCount }) => {
   showTooltip(weight === 1 ? t("mini.recorded") + " ✅" : t("mini.merged"));
 });
 
-window.babybump.onMiniInit(async ({ todayCount, lang, locale }) => {
+window.babybump.onMiniInit(async ({ todayCount, lang, locale, theme }) => {
   if (locale) applyLocale(lang, locale);
   else if (!localeData) await initI18n();
+  if (theme) applyTheme(theme);
   setTodayCount(todayCount);
   const state = await window.babybump.load();
   weekEl.textContent = weekTextOf(state.settings) || "";
   showTooltip(t("mini.guide"));
 });
+if (window.babybump.onThemeChanged) {
+  window.babybump.onThemeChanged((theme) => applyTheme(theme));
+}
 
 function setTodayCount(n) {
-  countEl.textContent = countWithUnit(n);
+  const value = Number(n);
+  countEl.textContent = Number.isFinite(value) ? String(value) : "--";
+}
+
+async function applyThemeFromApp() {
+  if (window.babybump && window.babybump.getTheme) {
+    applyTheme(await window.babybump.getTheme());
+    return;
+  }
+  if (!window.babybump) return;
+  const state = await window.babybump.load();
+  const s = state.settings || {};
+  applyTheme({ theme: s.theme, accent: s.accent });
 }
 
 async function refreshFromState() {
@@ -262,12 +416,15 @@ async function refreshFromState() {
   const today = state.records.filter(r => isToday(r.ts) && r.weight > 0).length;
   setTodayCount(today);
   weekEl.textContent = weekTextOf(state.settings) || "";
+  const s = state.settings || {};
+  applyTheme({ theme: s.theme, accent: s.accent });
 }
 
 /* ── 启动时同步 ── */
 (async () => {
   await initI18n();
   applyTranslations();
+  await applyThemeFromApp();
   await refreshFromState();
   if (window.babybump && window.babybump.onLocaleChanged) {
     window.babybump.onLocaleChanged(({ lang, locale }) => {

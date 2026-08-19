@@ -79,7 +79,8 @@
     "anomalyOff": "异常提醒已关闭",
     "exported": "CSV 已导出",
     "synced": "手机记录已同步",
-    "trayRecord": "托盘记录 · {time}"
+    "trayRecord": "托盘记录 · {time}",
+    "themeReset": "已恢复默认主题"
   },
   "settings": {
     "title": "设置",
@@ -117,7 +118,16 @@
     "mobileEntryDesc": "手机与电脑连接同一 Wi‑Fi 后，用手机浏览器打开配对地址",
     "showAddress": "显示地址",
     "language": "语言",
-    "languageDesc": "切换界面语言"
+    "languageDesc": "切换界面语言",
+    "theme": "主题",
+    "themeDesc": "选择主题。跟随系统会使用你的操作系统偏好。",
+    "themeReset": "恢复默认",
+    "themeSystem": "跟随系统",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "themeBlue": "魔法蓝",
+    "themeClassic": "经典深色",
+    "themeCustom": "自定义颜色"
   },
   "week": {
     "notSet": "孕周未开启",

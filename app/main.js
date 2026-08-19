@@ -1,6 +1,6 @@
 "use strict";
 /* ══════════════ BabyBump 主进程 ══════════════ */
-const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, nativeImage, Notification, screen } = require("electron");
+const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, nativeImage, Notification, screen, nativeTheme } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
@@ -113,6 +113,81 @@ function getAvailableLocales() {
   }
 }
 
+const THEME_PRESETS = ["system", "light", "dark", "blue", "classic"];
+const DEFAULT_THEME = "light";
+const DEFAULT_ACCENT = "#E07A5F";
+const THEME_BACKGROUNDS = {
+  light: "#FAF7F2",
+  dark: "#1A1715",
+  blue: "#10172A",
+  classic: "#111111"
+};
+
+function normalizeHex(hex) {
+  if (typeof hex !== "string") return DEFAULT_ACCENT;
+  let value = hex.trim();
+  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+    value = "#" + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
+  }
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : DEFAULT_ACCENT;
+}
+
+function nativeThemeDark() {
+  return !!nativeTheme.shouldUseDarkColors;
+}
+
+let themeCache = null;
+
+function getThemeSettings() {
+  if (themeCache) return themeCache;
+  const settings = loadState().settings || {};
+  const theme = THEME_PRESETS.includes(settings.theme) ? settings.theme : DEFAULT_THEME;
+  const accent = normalizeHex(settings.accent || DEFAULT_ACCENT);
+  const resolved = theme === "system" ? (nativeThemeDark() ? "dark" : "light") : theme;
+  themeCache = { theme, accent, resolved };
+  return themeCache;
+}
+
+function themeQuery() {
+  const { theme, accent } = getThemeSettings();
+  return { theme, accent: String(accent).replace(/^#/, "") };
+}
+
+function themeBackground() {
+  return THEME_BACKGROUNDS[getThemeSettings().resolved] || THEME_BACKGROUNDS.light;
+}
+
+function broadcastTheme(payload) {
+  const next = payload || getThemeSettings();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("theme:changed", next);
+    try { mainWindow.setBackgroundColor(THEME_BACKGROUNDS[next.resolved] || THEME_BACKGROUNDS.light); } catch (e) {}
+  }
+  if (miniWindow && !miniWindow.isDestroyed()) {
+    miniWindow.webContents.send("theme:changed", next);
+    if (!miniWindow.webContents.isLoading()) {
+      miniWindow.webContents.executeJavaScript(
+        `if (typeof applyTheme === "function") applyTheme(${JSON.stringify(next)});`,
+        true
+      ).catch(() => {});
+    }
+  }
+}
+
+function setThemeSettings({ theme, accent } = {}) {
+  const current = getThemeSettings();
+  const nextTheme = THEME_PRESETS.includes(theme) ? theme : current.theme;
+  const nextAccent = accent ? normalizeHex(accent) : current.accent;
+  const resolved = nextTheme === "system" ? (nativeThemeDark() ? "dark" : "light") : nextTheme;
+  themeCache = { theme: nextTheme, accent: nextAccent, resolved };
+  const state = loadState();
+  state.settings.theme = nextTheme;
+  state.settings.accent = nextAccent;
+  saveState(state);
+  broadcastTheme(themeCache);
+  return themeCache;
+}
+
 /* ── 手机端 PWA 同步服务：仅局域网可访问，使用持久化配对令牌 ── */
 const SYNC_PORT = 18765;
 let syncServer = null;
@@ -215,7 +290,7 @@ function createWindow() {
     minHeight: 620,
     title: "BabyBump · 胎动记录",
     icon: path.join(__dirname, "assets", "icon.png"),
-    backgroundColor: "#FAF7F2",
+    backgroundColor: themeBackground(),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -236,7 +311,9 @@ function createWindow() {
     }
   }
   mainWindow = new BrowserWindow(opts);
-  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"), {
+    query: themeQuery()
+  });
 
   // 位置/大小变化 → 节流保存（下次启动恢复）
   const saveBounds = () => {
@@ -287,7 +364,9 @@ function createMiniWindow() {
     opts.y = pos.y;
   }
   miniWindow = new BrowserWindow(opts);
-  miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"));
+  miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"), {
+    query: themeQuery()
+  });
   miniWindow.setAlwaysOnTop(true, "floating");
   miniWindow.webContents.on("did-finish-load", sendMiniInit);
   // 拖拽后记住位置（节流保存）
@@ -310,16 +389,30 @@ function sendMiniInit() {
   miniWindow.webContents.send("mini:init", {
     todayCount: todayCount(),
     lang: resolveLang(),
-    locale: getLocale()
+    locale: getLocale(),
+    theme: getThemeSettings()
   });
 }
 
 function showMini() {
   setMode("mini");
   if (!miniWindow) createMiniWindow();
+  else {
+    miniWindow.loadFile(path.join(__dirname, "renderer", "mini.html"), {
+      query: themeQuery()
+    });
+  }
   if (mainWindow) mainWindow.hide();
   miniWindow.show();
-  if (!miniWindow.webContents.isLoading()) sendMiniInit();
+  const apply = () => {
+    sendMiniInit();
+    broadcastTheme(getThemeSettings());
+  };
+  if (miniWindow.webContents.isLoading()) {
+    miniWindow.webContents.once("did-finish-load", apply);
+  } else {
+    apply();
+  }
 }
 
 function todayCount() {
@@ -467,6 +560,15 @@ ipcMain.handle("data:save", (e, state) => {
   const ok = saveState(state);
   // 快捷键变更后重新注册全局快捷键
   try { registerShortcut(); } catch (err) { console.error("re-register shortcut failed:", err); }
+  if (state && state.settings) {
+    const theme = THEME_PRESETS.includes(state.settings.theme) ? state.settings.theme : DEFAULT_THEME;
+    const accent = normalizeHex(state.settings.accent || DEFAULT_ACCENT);
+    const resolved = theme === "system" ? (nativeThemeDark() ? "dark" : "light") : theme;
+    const next = { theme, accent, resolved };
+    const changed = !themeCache || themeCache.theme !== next.theme || themeCache.accent !== next.accent || themeCache.resolved !== next.resolved;
+    themeCache = next;
+    if (changed) broadcastTheme(next);
+  }
   return ok;
 });
 ipcMain.handle("app:shortcut", () => getShortcutDisplay());
@@ -479,6 +581,8 @@ ipcMain.handle("sync:info", () => syncInfo());
 ipcMain.handle("locale:get", () => ({ lang: resolveLang(), locale: getLocale() }));
 ipcMain.handle("locale:set", (_e, lang) => { setLocale(lang); return { lang, locale: getLocale() }; });
 ipcMain.handle("locale:list", () => getAvailableLocales());
+ipcMain.handle("theme:get", () => getThemeSettings());
+ipcMain.handle("theme:set", (_e, payload) => setThemeSettings(payload || {}));
 ipcMain.handle("mini:record", () => {
   const r = doRecord("mini");
   // 同步主窗口 UI
@@ -520,6 +624,13 @@ if (!gotLock) {
     startSyncServer();
     createTray();
     registerShortcut();
+    nativeTheme.on("updated", () => {
+      if (getThemeSettings().theme === "system") {
+        const resolved = nativeThemeDark() ? "dark" : "light";
+        if (themeCache) themeCache = { ...themeCache, resolved };
+        broadcastTheme(getThemeSettings());
+      }
+    });
     // 记住上次模式：mini 只开 mini，full 只开完整版
     if (getMode() === "mini") {
       showMini();

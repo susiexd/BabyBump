@@ -4,6 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BabyBump · 胎动记录</title>
+<script>
+(function () {
+  var DEFAULT_ACCENT = "#E07A5F";
+  var p = new URLSearchParams(location.search);
+  var pref = p.get("theme") || "light";
+  var raw = p.get("accent") || DEFAULT_ACCENT;
+  var accent = raw.charAt(0) === "#" ? raw : "#" + raw;
+  var resolved = pref;
+  if (pref === "system") {
+    resolved = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.themePref = pref;
+  document.documentElement.style.setProperty("--accent", accent);
+})();
+</script>
 <style>
   :root {
     --bg: #FAF7F2;
@@ -14,8 +30,10 @@
     --ink-3: #9C9086;
     --line: #E8E0D6;
     --accent: #E07A5F;
+    --accent-deep: color-mix(in srgb, var(--accent) 86%, #000);
     --accent-ink: #FFFFFF;
-    --accent-soft: #FBE9E2;
+    --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    --accent-tint: color-mix(in srgb, var(--accent) 12%, var(--surface));
     --ok: #6A994E;
     --ok-soft: #EAF3E3;
     --warn: #C97B2D;
@@ -24,6 +42,59 @@
     --danger-soft: #FBE7E4;
     --radius: 14px;
     --shadow: 0 1px 2px rgba(43,36,32,.05), 0 8px 24px rgba(43,36,32,.06);
+    --theme-select: #34C759;
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    --bg: #1A1715;
+    --surface: #24201D;
+    --surface-2: #2F2A26;
+    --ink: #F4EDE7;
+    --ink-2: #C4B6AC;
+    --ink-3: #8F837B;
+    --line: #3C342F;
+    --ok: #8FBF6A;
+    --ok-soft: color-mix(in srgb, var(--ok) 18%, var(--surface));
+    --warn: #E0A04A;
+    --warn-soft: color-mix(in srgb, var(--warn) 18%, var(--surface));
+    --danger: #E07068;
+    --danger-soft: color-mix(in srgb, var(--danger) 18%, var(--surface));
+    --shadow: 0 1px 2px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.28);
+    color-scheme: dark;
+  }
+  html[data-theme="blue"] {
+    --bg: #10172A;
+    --surface: #182238;
+    --surface-2: #212C46;
+    --ink: #E8EEF8;
+    --ink-2: #A9B6D0;
+    --ink-3: #6E7C99;
+    --line: #2A3654;
+    --ok: #7BC67A;
+    --ok-soft: color-mix(in srgb, var(--ok) 18%, var(--surface));
+    --warn: #E0A04A;
+    --warn-soft: color-mix(in srgb, var(--warn) 18%, var(--surface));
+    --danger: #E07068;
+    --danger-soft: color-mix(in srgb, var(--danger) 18%, var(--surface));
+    --shadow: 0 1px 2px rgba(0,0,0,.22), 0 8px 24px rgba(0,0,0,.32);
+    color-scheme: dark;
+  }
+  html[data-theme="classic"] {
+    --bg: #111111;
+    --surface: #1C1C1C;
+    --surface-2: #262626;
+    --ink: #F2F2F2;
+    --ink-2: #B8B8B8;
+    --ink-3: #808080;
+    --line: #2E2E2E;
+    --ok: #7CB86A;
+    --ok-soft: color-mix(in srgb, var(--ok) 18%, var(--surface));
+    --warn: #D4A04A;
+    --warn-soft: color-mix(in srgb, var(--warn) 18%, var(--surface));
+    --danger: #D0645C;
+    --danger-soft: color-mix(in srgb, var(--danger) 18%, var(--surface));
+    --shadow: 0 1px 2px rgba(0,0,0,.24), 0 8px 24px rgba(0,0,0,.34);
+    color-scheme: dark;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -67,8 +138,8 @@
   /* 孕期卡片：倒计时视觉风格 */
   .week-badge {
     margin: 12px 10px 0; padding: 14px 14px 12px;
-    background: linear-gradient(165deg, #FDF1EA 0%, #FBE9E2 100%);
-    border: 1px solid #F3D9CE;
+    background: linear-gradient(165deg, var(--accent-tint) 0%, var(--accent-soft) 100%);
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
     border-radius: 14px;
   }
   .week-badge .wb-countdown {
@@ -85,7 +156,7 @@
     white-space: nowrap;
   }
   .week-badge .wb-week b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .week-badge .wb-progress { height: 4px; background: rgba(224,122,95,.15); border-radius: 99px; margin: 10px 0 9px; overflow: hidden; }
+  .week-badge .wb-progress { height: 4px; background: color-mix(in srgb, var(--accent) 18%, var(--surface)); border-radius: 99px; margin: 10px 0 9px; overflow: hidden; }
   .week-badge .wb-progress > div { height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s ease; }
   .week-badge .wb-due { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
   .week-badge .wb-empty { font-size: 12px; color: var(--ink-2); }
@@ -111,15 +182,15 @@
     width: 200px; height: 200px; border-radius: 50%; border: none; cursor: pointer;
     background: var(--accent); color: var(--accent-ink);
     font-family: inherit;
-    box-shadow: 0 10px 24px rgba(224,122,95,.38);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 38%, transparent);
     transition: transform .08s ease, box-shadow .15s ease, background .15s;
     position: relative; overflow: hidden;
     -webkit-user-select: none; user-select: none;
     touch-action: manipulation;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   }
-  .kick-btn:hover { background: #d96f53; }
-  .kick-btn:active { transform: scale(.94); box-shadow: 0 4px 12px rgba(224,122,95,.3); }
+  .kick-btn:hover { background: var(--accent-deep); }
+  .kick-btn:active { transform: scale(.94); box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 30%, transparent); }
   .kick-btn .kb-count { font-size: 54px; font-weight: 800; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .kick-btn .kb-count small { font-size: 18px; font-weight: 600; margin-left: 2px; }
   .kick-btn .kb-sub { font-size: 12.5px; font-weight: 500; opacity: .88; margin-top: 2px; }
@@ -164,10 +235,10 @@
     border: none; border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 600;
     font-family: inherit; cursor: pointer; transition: background .12s;
   }
-  .btn.primary { background: var(--accent); color: #fff; }
-  .btn.primary:hover { background: #d96f53; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { background: var(--accent-deep); }
   .btn.ghost { background: var(--surface-2); color: var(--ink-2); }
-  .btn.ghost:hover { background: #ece4d8; }
+  .btn.ghost:hover { background: color-mix(in srgb, var(--surface-2) 70%, var(--ink) 12%); }
   .btn.sm { padding: 5px 10px; font-size: 12px; }
   .sc-actions { margin-top: 12px; display: flex; gap: 8px; }
   .sc-note { font-size: 11.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.55; }
@@ -224,7 +295,7 @@
     flex: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 8px;
     padding: 6px 0; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; font-family: inherit;
   }
-  .seg button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .seg button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
   /* Settings */
   .set-group { margin-bottom: 22px; }
@@ -243,6 +314,101 @@
   .toggle.on { background: var(--ok); }
   .toggle::after { content: ""; position: absolute; top: 2.5px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
   .toggle.on::after { left: 19px; }
+
+  /* Theme picker */
+  .theme-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    margin-bottom: 10px;
+  }
+  .theme-head h3 { margin-bottom: 3px; color: var(--ink-2); font-size: 13px; font-weight: 700; }
+  .theme-head .desc { font-size: 11.5px; color: var(--ink-3); line-height: 1.55; max-width: 420px; }
+  .theme-reset {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: none; background: transparent; color: var(--ink-2);
+    font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    padding: 4px 2px; flex-shrink: 0; white-space: nowrap;
+  }
+  .theme-reset:hover { color: var(--ink); }
+  .theme-reset svg { width: 14px; height: 14px; }
+  .theme-box {
+    border: 1px solid var(--line); border-radius: 12px;
+    background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+    padding: 12px;
+  }
+  .theme-cards {
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;
+  }
+  .theme-card {
+    border: none; background: transparent; padding: 0; cursor: pointer;
+    font: inherit; color: inherit; text-align: center;
+  }
+  .theme-preview {
+    height: 62px; border-radius: 10px; overflow: hidden; position: relative;
+    border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+    transition: border-color .15s, box-shadow .15s, transform .12s;
+  }
+  .theme-card:hover .theme-preview { transform: translateY(-1px); }
+  .theme-card.active .theme-preview {
+    border-color: var(--theme-select);
+    box-shadow: 0 0 0 1px var(--theme-select);
+  }
+  .theme-preview .tp-side {
+    position: absolute; inset: 8px auto 8px 8px; width: 18%;
+    border-radius: 5px 0 0 5px;
+  }
+  .theme-preview .tp-main {
+    position: absolute; inset: 8px 8px 8px 28%;
+    border-radius: 0 5px 5px 0;
+  }
+  .theme-card[data-theme="system"] .theme-preview {
+    background:
+      linear-gradient(90deg, #F4FFFB 0 50%, #1A1A1A 50%),
+      #F4FFFB;
+  }
+  .theme-card[data-theme="system"] .tp-side { background: #E8F7F1; }
+  .theme-card[data-theme="system"] .tp-main {
+    background: linear-gradient(90deg, #FFFFFF 0 36%, #111111 36%);
+  }
+  .theme-card[data-theme="light"] .theme-preview { background: #F7FFFC; }
+  .theme-card[data-theme="light"] .tp-side { background: #EEF8F4; }
+  .theme-card[data-theme="light"] .tp-main { background: #FFFFFF; }
+  .theme-card[data-theme="dark"] .theme-preview { background: #2A3331; }
+  .theme-card[data-theme="dark"] .tp-side { background: #232B29; }
+  .theme-card[data-theme="dark"] .tp-main { background: #1B2120; }
+  .theme-card[data-theme="blue"] .theme-preview { background: #2A3358; }
+  .theme-card[data-theme="blue"] .tp-side { background: #242C4E; }
+  .theme-card[data-theme="blue"] .tp-main { background: #1A2140; }
+  .theme-card[data-theme="classic"] .theme-preview { background: #232823; }
+  .theme-card[data-theme="classic"] .tp-side { background: #1B201B; }
+  .theme-card[data-theme="classic"] .tp-main { background: #111411; }
+  .theme-card-label {
+    display: block; margin-top: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink);
+  }
+  .theme-swatches {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+    margin-top: 10px; padding: 10px 2px 6px; border-top: 1px solid var(--line);
+  }
+  .theme-swatch {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid color-mix(in srgb, var(--ink) 8%, transparent);
+    background: var(--swatch); cursor: pointer; padding: 0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.04);
+    transition: transform .12s, box-shadow .12s, border-color .12s;
+  }
+  .theme-swatch:hover { transform: scale(1.08); }
+  .theme-swatch.active {
+    border-color: var(--theme-select);
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--theme-select);
+  }
+  .theme-swatch.custom {
+    background:
+      conic-gradient(#ff5a5a, #ffd15a, #5aff6a, #5ad6ff, #6a5aff, #ff5ad6, #ff5a5a);
+    position: relative;
+  }
+  .theme-swatch.custom input {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    border: 0; padding: 0;
+  }
 
   /* Demo bar */
   .demo-bar {
@@ -431,6 +597,60 @@
         </div>
       </div>
       <div class="set-group">
+        <div class="theme-head">
+          <div>
+            <h3 data-i18n="settings.theme">主题</h3>
+            <div class="desc" data-i18n="settings.themeDesc">选择主题。跟随系统会使用你的操作系统偏好。</div>
+          </div>
+          <button type="button" class="theme-reset" id="theme-reset">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+            <span data-i18n="settings.themeReset">恢复默认</span>
+          </button>
+        </div>
+        <div class="theme-box">
+          <div class="theme-cards" id="theme-cards">
+            <button type="button" class="theme-card" data-theme="system">
+              <div class="theme-preview"><span class="tp-side"></span><span class="tp-main"></span></div>
+              <span class="theme-card-label" data-i18n="settings.themeSystem">跟随系统</span>
+            </button>
+            <button type="button" class="theme-card" data-theme="light">
+              <div class="theme-preview"><span class="tp-side"></span><span class="tp-main"></span></div>
+              <span class="theme-card-label" data-i18n="settings.themeLight">浅色</span>
+            </button>
+            <button type="button" class="theme-card" data-theme="dark">
+              <div class="theme-preview"><span class="tp-side"></span><span class="tp-main"></span></div>
+              <span class="theme-card-label" data-i18n="settings.themeDark">深色</span>
+            </button>
+            <button type="button" class="theme-card" data-theme="blue">
+              <div class="theme-preview"><span class="tp-side"></span><span class="tp-main"></span></div>
+              <span class="theme-card-label" data-i18n="settings.themeBlue">魔法蓝</span>
+            </button>
+            <button type="button" class="theme-card" data-theme="classic">
+              <div class="theme-preview"><span class="tp-side"></span><span class="tp-main"></span></div>
+              <span class="theme-card-label" data-i18n="settings.themeClassic">经典深色</span>
+            </button>
+          </div>
+          <div class="theme-swatches" id="theme-swatches">
+            <button type="button" class="theme-swatch" data-accent="#E07A5F" style="--swatch:#E07A5F" aria-label="#E07A5F"></button>
+            <button type="button" class="theme-swatch" data-accent="#E8E4DF" style="--swatch:#E8E4DF" aria-label="#E8E4DF"></button>
+            <button type="button" class="theme-swatch" data-accent="#E7EAF3" style="--swatch:#E7EAF3" aria-label="#E7EAF3"></button>
+            <button type="button" class="theme-swatch" data-accent="#F4DCE8" style="--swatch:#F4DCE8" aria-label="#F4DCE8"></button>
+            <button type="button" class="theme-swatch" data-accent="#F7E6D0" style="--swatch:#F7E6D0" aria-label="#F7E6D0"></button>
+            <button type="button" class="theme-swatch" data-accent="#F3EBD0" style="--swatch:#F3EBD0" aria-label="#F3EBD0"></button>
+            <button type="button" class="theme-swatch" data-accent="#E4EEDD" style="--swatch:#E4EEDD" aria-label="#E4EEDD"></button>
+            <button type="button" class="theme-swatch" data-accent="#D8F1EE" style="--swatch:#D8F1EE" aria-label="#D8F1EE"></button>
+            <button type="button" class="theme-swatch" data-accent="#D6EAF6" style="--swatch:#D6EAF6" aria-label="#D6EAF6"></button>
+            <button type="button" class="theme-swatch" data-accent="#DDE3F5" style="--swatch:#DDE3F5" aria-label="#DDE3F5"></button>
+            <button type="button" class="theme-swatch" data-accent="#E6E0F4" style="--swatch:#E6E0F4" aria-label="#E6E0F4"></button>
+            <button type="button" class="theme-swatch" data-accent="#F3DDE8" style="--swatch:#F3DDE8" aria-label="#F3DDE8"></button>
+            <button type="button" class="theme-swatch" data-accent="#EFE6DC" style="--swatch:#EFE6DC" aria-label="#EFE6DC"></button>
+            <button type="button" class="theme-swatch custom" id="theme-custom" data-i18n-title="settings.themeCustom" title="自定义颜色">
+              <input type="color" id="set-accent-custom" value="#E07A5F" data-i18n-aria="settings.themeCustom" aria-label="自定义颜色">
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="set-group">
         <h3 data-i18n="settings.language">语言</h3>
         <div class="set-row">
           <div class="set-label"><span data-i18n="settings.language">语言</span><span class="desc" data-i18n="settings.languageDesc">切换界面语言</span></div>
@@ -497,6 +717,7 @@ async function changeLanguage(lang) {
     renderAll();
     updateSettingsUI();
     updateKickHint();
+    renderThemePicker();
   }
 }
 
@@ -509,6 +730,16 @@ function applyTranslations() {
     if (value !== key && el.children.length === 0) {
       el.textContent = value;
     }
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach(el => {
+    const key = el.getAttribute("data-i18n-title");
+    const value = t(key);
+    if (value !== key) el.setAttribute("title", value);
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => {
+    const key = el.getAttribute("data-i18n-aria");
+    const value = t(key);
+    if (value !== key) el.setAttribute("aria-label", value);
   });
 }
 
@@ -770,6 +1001,11 @@ function renderHistory() {
     }).join("");
 }
 
+function themeColor(name, fallback) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
 function drawLine(days) {
   const svg = document.getElementById("line-chart");
   const W = svg.clientWidth || 600, H = 200;
@@ -778,36 +1014,159 @@ function drawLine(days) {
   const max = Math.max(1, ...days.map(d => d.n), 10);
   const x = i => P.l + (days.length === 1 ? iw/2 : i * iw / (days.length - 1));
   const y = n => P.t + ih - n / max * ih;
+  const grid = themeColor("--line", "#EDE6DC");
+  const muted = themeColor("--ink-3", "#9C9086");
+  const ok = themeColor("--ok", "#6A994E");
+  const accent = themeColor("--accent", "#E07A5F");
+  const accentSoft = themeColor("--accent-soft", "#FBE9E2");
+  const danger = themeColor("--danger", "#B5453A");
   let html = "";
   /* grid lines */
   for (let g = 0; g <= 4; g++) {
     const gy = P.t + ih * g / 4;
-    html += `<line x1="${P.l}" y1="${gy}" x2="${W-P.r}" y2="${gy}" stroke="#EDE6DC" stroke-width="1"/>`;
+    html += `<line x1="${P.l}" y1="${gy}" x2="${W-P.r}" y2="${gy}" stroke="${grid}" stroke-width="1"/>`;
     const val = Math.round(max - max * g / 4);
-    html += `<text x="${P.l-8}" y="${gy+4}" font-size="10" fill="#9C9086" text-anchor="end">${val}</text>`;
+    html += `<text x="${P.l-8}" y="${gy+4}" font-size="10" fill="${muted}" text-anchor="end">${val}</text>`;
   }
   /* baseline reference */
   const base = baseline();
   if (base) {
     const by = y(base);
-    html += `<line x1="${P.l}" y1="${by}" x2="${W-P.r}" y2="${by}" stroke="#6A994E" stroke-width="1.5" stroke-dasharray="4 3"/>`;
-    html += `<text x="${W-P.r-4}" y="${by-5}" font-size="10" fill="#6A994E" text-anchor="end">${t("status.baseline", { count: base })}</text>`;
+    html += `<line x1="${P.l}" y1="${by}" x2="${W-P.r}" y2="${by}" stroke="${ok}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+    html += `<text x="${W-P.r-4}" y="${by-5}" font-size="10" fill="${ok}" text-anchor="end">${t("status.baseline", { count: base })}</text>`;
   }
   /* area + line */
   const pts = days.map((d,i) => `${x(i)},${y(d.n)}`).join(" ");
-  html += `<polygon points="${P.l},${P.t+ih} ${pts} ${x(days.length-1)},${P.t+ih}" fill="#FBE9E2" opacity="0.6"/>`;
-  html += `<polyline points="${pts}" fill="none" stroke="#E07A5F" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  html += `<polygon points="${P.l},${P.t+ih} ${pts} ${x(days.length-1)},${P.t+ih}" fill="${accentSoft}" opacity="0.6"/>`;
+  html += `<polyline points="${pts}" fill="none" stroke="${accent}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
   /* dots */
   days.forEach((d,i) => {
     const low = base && d.n > 0 && d.n < base * 0.5;
-    const color = low ? "#B5453A" : (d.n === 0 ? "#C9BEB2" : "#E07A5F");
+    const color = low ? danger : (d.n === 0 ? muted : accent);
     html += `<circle cx="${x(i)}" cy="${y(d.n)}" r="3.5" fill="${color}"/>`;
-    html += `<text x="${x(i)}" y="${H-6}" font-size="9.5" fill="#9C9086" text-anchor="middle">${days[i].key.slice(5).replace("-","/")}</text>`;
+    html += `<text x="${x(i)}" y="${H-6}" font-size="9.5" fill="${muted}" text-anchor="middle">${days[i].key.slice(5).replace("-","/")}</text>`;
   });
   svg.innerHTML = html;
 }
 
 /* ══════════════ Settings ══════════════ */
+const THEME_PRESETS = ["system", "light", "dark", "blue", "classic"];
+const DEFAULT_THEME = "light";
+const DEFAULT_ACCENT = "#E07A5F";
+
+function normalizeHex(hex) {
+  if (typeof hex !== "string") return DEFAULT_ACCENT;
+  let value = hex.trim();
+  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+    value = "#" + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
+  }
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : DEFAULT_ACCENT;
+}
+
+function hexToRgb(hex) {
+  const value = normalizeHex(hex).slice(1);
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16)
+  };
+}
+
+function rgbToHsl({ r, g, b }) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return { h: h / 6, s, l };
+}
+
+function hslToHex(h, s, l) {
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  const to = (n) => Math.round(n * 255).toString(16).padStart(2, "0");
+  return ("#" + to(r) + to(g) + to(b)).toUpperCase();
+}
+
+function usableAccent(hex) {
+  const { h, s, l } = rgbToHsl(hexToRgb(hex));
+  if (l > 0.72 || s < 0.16) return hslToHex(h, Math.max(s, 0.38), 0.50);
+  return normalizeHex(hex);
+}
+
+function resolveTheme(pref) {
+  if (pref === "system") {
+    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return THEME_PRESETS.includes(pref) ? pref : DEFAULT_THEME;
+}
+
+function renderThemePicker() {
+  const pref = THEME_PRESETS.includes(settings.theme) ? settings.theme : DEFAULT_THEME;
+  const accent = normalizeHex(settings.accent || DEFAULT_ACCENT);
+  document.querySelectorAll(".theme-card").forEach(card => {
+    card.classList.toggle("active", card.dataset.theme === pref);
+  });
+  let matched = false;
+  document.querySelectorAll(".theme-swatch[data-accent]").forEach(swatch => {
+    const on = normalizeHex(swatch.dataset.accent) === accent;
+    swatch.classList.toggle("active", on);
+    if (on) matched = true;
+  });
+  const custom = document.getElementById("theme-custom");
+  const picker = document.getElementById("set-accent-custom");
+  if (custom) {
+    custom.classList.toggle("active", !matched);
+    custom.title = t("settings.themeCustom");
+  }
+  if (picker) {
+    picker.value = accent;
+    picker.setAttribute("aria-label", t("settings.themeCustom"));
+  }
+}
+
+function applyTheme(pref, accent, persist = true) {
+  const themePref = THEME_PRESETS.includes(pref) ? pref : DEFAULT_THEME;
+  const color = normalizeHex(accent || DEFAULT_ACCENT);
+  const { l } = rgbToHsl(hexToRgb(color));
+  document.documentElement.dataset.theme = resolveTheme(themePref);
+  document.documentElement.dataset.themePref = themePref;
+  document.documentElement.style.setProperty("--accent", usableAccent(color));
+  if (l > 0.72) document.documentElement.style.setProperty("--accent-tint", color);
+  else document.documentElement.style.removeProperty("--accent-tint");
+  if (persist) {
+    settings.theme = themePref;
+    settings.accent = color;
+    saveState(state);
+    if (window.babybump && window.babybump.setTheme) {
+      window.babybump.setTheme({ theme: themePref, accent: color });
+    }
+  }
+  renderThemePicker();
+  renderHistory();
+}
+
 function renderSettings() {
   document.getElementById("set-shortcut").value = settings.shortcut || "space";
   document.getElementById("set-merge").value = settings.mergeSec == null ? "60" : String(settings.mergeSec);
@@ -820,6 +1179,7 @@ function renderSettings() {
   document.getElementById("set-remind-time").value = settings.remindTime || "20:00";
   document.getElementById("set-anomaly").classList.toggle("on", settings.anomaly !== false);
   document.getElementById("set-due").value = settings.dueDate || "";
+  renderThemePicker();
 }
 
 /* ══════════════ 孕周卡片 ══════════════ */
@@ -950,6 +1310,28 @@ document.getElementById("btn-export").addEventListener("click", () => {
 document.getElementById("set-language").addEventListener("change", e => {
   changeLanguage(e.target.value);
 });
+document.getElementById("theme-cards").addEventListener("click", e => {
+  const card = e.target.closest(".theme-card");
+  if (!card) return;
+  applyTheme(card.dataset.theme, settings.accent || DEFAULT_ACCENT);
+});
+document.getElementById("theme-swatches").addEventListener("click", e => {
+  const swatch = e.target.closest(".theme-swatch[data-accent]");
+  if (!swatch) return;
+  applyTheme(settings.theme || DEFAULT_THEME, swatch.dataset.accent);
+});
+document.getElementById("set-accent-custom").addEventListener("input", e => {
+  applyTheme(settings.theme || DEFAULT_THEME, e.target.value);
+});
+document.getElementById("theme-reset").addEventListener("click", () => {
+  applyTheme(DEFAULT_THEME, DEFAULT_ACCENT);
+  toast(t("toast.themeReset"));
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if ((settings.theme || DEFAULT_THEME) === "system") {
+    applyTheme("system", settings.accent || DEFAULT_ACCENT, false);
+  }
+});
 
 /* toast */
 let toastTimer;
@@ -974,8 +1356,26 @@ async function init() {
     }
   }
   applyTranslations();
+  applyTheme(settings.theme || DEFAULT_THEME, settings.accent || DEFAULT_ACCENT, false);
   renderAll();
   updateSettingsUI();
+  if (window.babybump && window.babybump.onThemeChanged) {
+    window.babybump.onThemeChanged(({ theme, accent }) => {
+      applyTheme(theme, accent, false);
+    });
+  }
+  if (window.babybump && window.babybump.onLocaleChanged) {
+    window.babybump.onLocaleChanged(({ lang, locale }) => {
+      currentLang = lang;
+      localeData = locale;
+      document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+      applyTranslations();
+      renderAll();
+      updateSettingsUI();
+      updateKickHint();
+      renderThemePicker();
+    });
+  }
 
   /* 托盘 / 全局快捷键触发的记录 */
   if (window.babybump) {
@@ -1008,6 +1408,7 @@ async function init() {
     window.babybump.onSyncChanged((next) => {
       state = next;
       settings = state.settings || {};
+      applyTheme(settings.theme || DEFAULT_THEME, settings.accent || DEFAULT_ACCENT, false);
       renderAll();
       toast(t("toast.synced"));
     });

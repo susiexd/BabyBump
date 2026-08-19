@@ -79,7 +79,8 @@
     "anomalyOff": "Low-activity alert off",
     "exported": "CSV exported",
     "synced": "Phone records synced",
-    "trayRecord": "Menu bar record · {time}"
+    "trayRecord": "Menu bar record · {time}",
+    "themeReset": "Theme reset to default"
   },
   "settings": {
     "title": "Settings",
@@ -117,7 +118,16 @@
     "mobileEntryDesc": "When your phone and computer are on the same Wi‑Fi, open the pairing link in your phone browser",
     "showAddress": "Show pairing link",
     "language": "Language",
-    "languageDesc": "Switch interface language"
+    "languageDesc": "Switch interface language",
+    "theme": "Theme",
+    "themeDesc": "Choose a theme. Follow system uses your operating system preference.",
+    "themeReset": "Restore default",
+    "themeSystem": "Follow system",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeBlue": "Magic Blue",
+    "themeClassic": "Classic Dark",
+    "themeCustom": "Custom color"
   },
   "week": {
     "notSet": "Due date not set",
@@ -132,7 +142,7 @@
     "dueDate": "Due {date}"
   },
   "mini": {
-    "dong": "Dong",
+    "dong": "Kicks",
     "recorded": "Kick logged",
     "merged": "Merged · kicks within 1 minute",
     "mergedBody": "Rolling kicks within 1 minute count as 1",
