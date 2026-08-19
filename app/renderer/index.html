@@ -264,6 +264,8 @@
   .hbars .bar { flex: 1; background: var(--surface-2); border-radius: 3px 3px 0 0; position: relative; min-height: 3px; }
   .hbars .bar.filled { background: var(--accent); }
   .hbars .bar.active { background: var(--ok); }
+  .hbars .bar.peak { background: var(--ok); }
+  .hbars .bar.peak:not(.filled) { background: color-mix(in srgb, var(--ok) 28%, var(--surface-2)); }
   .hbars .bar:hover::after {
     content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
     background: var(--ink); color: #fff; font-size: 10.5px; padding: 3px 7px; border-radius: 5px; white-space: nowrap; z-index: 5;
@@ -287,6 +289,19 @@
   .hist-table tr.normal td { color: var(--ok); }
   .hist-table tr.low td { color: var(--danger); }
   .hist-table .bar-cell { width: 34%; }
+
+  /* Activity period */
+  .activity-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    margin-bottom: 10px;
+  }
+  .activity-label { font-size: 12px; color: var(--ink-2); }
+  .activity-peak {
+    font-size: 20px; font-weight: 800; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums; color: var(--ok); line-height: 1.2;
+  }
+  .activity-meta { font-size: 12px; color: var(--ink-2); margin: 4px 0 14px; }
+  .activity-note { font-size: 11.5px; color: var(--ink-3); margin-top: 10px; line-height: 1.6; }
   .hist-table .mini-bar { height: 7px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
   .hist-table .mini-bar > div { height: 100%; border-radius: 99px; background: var(--accent); }
   .hist-table tr.low .mini-bar > div { background: var(--danger); }
@@ -506,9 +521,9 @@
           <ul class="tl" id="timeline"><li class="empty" style="list-style:none" data-i18n="today.emptyTimeline">还没有记录。<br>现在去点一下中间的按钮吧。</li></ul>
         </div>
         <div class="panel">
-          <h3><span data-i18n="today.hourlyTitle">小时分布</span> <span class="hint" data-i18n="today.hourlyActive">活跃时段</span></h3>
+          <h3><span data-i18n="today.hourlyTitle">小时分布</span> <span class="hint" id="hourly-hint" data-i18n="today.hourlyActive">活跃时段</span></h3>
           <div class="hbars" id="hbars"></div>
-          <div class="hbar-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+          <div class="hbar-labels" id="hbars-labels"></div>
         </div>
         <div class="panel">
           <h3><span data-i18n="today.baselineTitle">与基线的对比</span> <span class="hint" data-i18n="today.baselineHint">近 7 天</span></h3>
@@ -531,6 +546,10 @@
     <div class="panel chart-card">
       <h3 data-i18n="history.dailyCount">每日胎动次数</h3>
       <div class="chart-wrap"><svg class="chart-svg" id="line-chart"></svg></div>
+    </div>
+    <div class="panel chart-card">
+      <h3><span data-i18n="history.activityTitle">活跃时段</span> <span class="hint" id="activity-hint"></span></h3>
+      <div id="activity-box"></div>
     </div>
     <div class="panel chart-card">
       <h3 data-i18n="history.detail">明细</h3>
@@ -707,12 +726,17 @@ function dateLocale() {
   return currentLang === "zh" ? "zh-CN" : "en-US";
 }
 
+function applyDocumentMeta() {
+  document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+  document.title = t("app.title");
+}
+
 async function changeLanguage(lang) {
   if (window.babybump) {
     const result = await window.babybump.localeSet(lang);
     currentLang = result.lang;
     localeData = result.locale;
-    document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+    applyDocumentMeta();
     applyTranslations();
     renderAll();
     updateSettingsUI();
@@ -760,8 +784,13 @@ let settings = state.settings;
 const set = (k, v) => { settings[k] = v; saveState(state); };
 
 /* ══════════════ Date helpers ══════════════ */
-const fmtTime = ts => new Date(ts).toTimeString().slice(0,5);
+const fmtTime = ts => new Date(ts).toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit" });
 const fmtDate = ts => new Date(ts).toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
+const fmtClockHour = h => {
+  const d = new Date();
+  d.setHours(((h % 24) + 24) % 24, 0, 0, 0);
+  return d.toLocaleTimeString(dateLocale(), { hour: "numeric" });
+};
 function renderTodayDate() {
   document.getElementById("today-date").textContent =
     new Date().toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric", weekday: "long" });
@@ -825,6 +854,62 @@ function anomalyInfo() {
   return null;
 }
 
+function hourOf(ts) { return new Date(ts).getHours(); }
+function hourAxisHtml() {
+  return ["00:00", "06:00", "12:00", "18:00", "24:00"].map(s => `<span>${s}</span>`).join("");
+}
+function medianNums(vals) {
+  if (!vals.length) return 0;
+  const a = vals.slice().sort((x, y) => x - y);
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+/* Median hourly share + occupancy peak window. Null until 3 logged days and 10 kicks. */
+function activityProfile(days) {
+  const observed = days.filter(d => d.n > 0);
+  const totalKicks = observed.reduce((s, d) => s + d.n, 0);
+  if (observed.length < 3 || totalKicks < 10) return null;
+
+  const dailyShares = observed.map(d => {
+    const counts = new Array(24).fill(0);
+    for (const r of d.records) {
+      if (r.weight > 0) counts[hourOf(r.ts)] += r.weight;
+    }
+    return counts.map(c => c / d.n);
+  });
+  const occupancyHits = new Array(24).fill(0);
+  for (const d of observed) {
+    const seen = new Array(24).fill(false);
+    for (const r of d.records) {
+      if (r.weight > 0) seen[hourOf(r.ts)] = true;
+    }
+    seen.forEach((v, h) => { if (v) occupancyHits[h]++; });
+  }
+
+  const share = Array.from({ length: 24 }, (_, h) => medianNums(dailyShares.map(s => s[h])));
+  const occupancy = occupancyHits.map(c => c / observed.length);
+
+  let peakStart = 0, peakScore = -1;
+  for (let h = 0; h < 24; h++) {
+    const score = occupancy[h] + occupancy[(h + 1) % 24];
+    if (score > peakScore) { peakScore = score; peakStart = h; }
+  }
+  const peakHit = observed.filter(d => d.records.some(r => {
+    if (r.weight <= 0) return false;
+    const h = hourOf(r.ts);
+    return h === peakStart || h === (peakStart + 1) % 24;
+  })).length;
+
+  return {
+    days: observed.length,
+    share,
+    peakStart,
+    peakEnd: (peakStart + 2) % 24,
+    peakHit,
+    inPeak: h => h === peakStart || h === (peakStart + 1) % 24
+  };
+}
+
 /* ══════════════ Rendering: Today ══════════════ */
 function renderAll() { renderTodayDate(); renderToday(); renderHistory(); renderSettings(); renderWeek(); }
 
@@ -884,16 +969,27 @@ function renderToday() {
     }).join("");
   }
 
-  /* hour bars */
+  /* hour bars — highlight the usual peak window when we have one */
   const hbars = document.getElementById("hbars");
   const hourCounts = new Array(24).fill(0);
-  for (const r of recs) hourCounts[new Date(r.ts).getHours()]++;
+  for (const r of recs) hourCounts[hourOf(r.ts)]++;
   const max = Math.max(1, ...hourCounts);
-  const curHour = new Date().getHours();
+  const peak = activityProfile(recordsByDay(7));
+  const hourlyHint = document.getElementById("hourly-hint");
+  if (peak) {
+    hourlyHint.removeAttribute("data-i18n");
+    hourlyHint.textContent = t("today.hourlyPeak", { start: fmtClockHour(peak.peakStart), end: fmtClockHour(peak.peakEnd) });
+  } else {
+    hourlyHint.setAttribute("data-i18n", "today.hourlyActive");
+    hourlyHint.textContent = t("today.hourlyActive");
+  }
   hbars.innerHTML = hourCounts.map((n, h) => {
-    const cls = n > 0 ? "bar filled" : "bar";
-    return `<div class="${cls}${h === curHour && n > 0 ? " active" : ""}" style="height:${Math.max(4, Math.round(n/max*100))}%" data-tip="${t("today.hourTip", { hour: h, count: n })}"></div>`;
+    const classes = ["bar"];
+    if (n > 0) classes.push("filled");
+    if (peak && peak.inPeak(h)) classes.push("peak");
+    return `<div class="${classes.join(" ")}" style="height:${Math.max(4, Math.round(n/max*100))}%" data-tip="${t("today.hourTip", { time: fmtClockHour(h), count: countWithUnit(n) })}"></div>`;
   }).join("");
+  document.getElementById("hbars-labels").innerHTML = hourAxisHtml();
 
   /* baseline box */
   const box = document.getElementById("baseline-box");
@@ -989,6 +1085,7 @@ let histRange = 7;
 function renderHistory() {
   const days = recordsByDay(histRange);
   drawLine(days);
+  renderActivity(days);
   const table = document.getElementById("hist-table");
   const base = baseline();
   table.innerHTML = `<tr><th>${t("history.date")}</th><th>${t("history.count")}</th><th style="text-align:left">${t("history.relative")}</th></tr>` +
@@ -999,6 +1096,35 @@ function renderHistory() {
         <td>${d.n === 0 ? "0" : countWithUnit(d.n)}</td>
         <td class="bar-cell"><div class="mini-bar"><div style="width:${pct}%"></div></div></td></tr>`;
     }).join("");
+}
+
+function renderActivity(days) {
+  const hint = document.getElementById("activity-hint");
+  const box = document.getElementById("activity-box");
+  hint.textContent = t("history.activityHint", { days: histRange });
+  const profile = activityProfile(days);
+  if (!profile) {
+    box.innerHTML = `<div class="empty">${t("history.activityEmpty")}</div>`;
+    return;
+  }
+  const maxShare = Math.max(0.01, ...profile.share);
+  const bars = profile.share.map((p, h) => {
+    const pct = Math.round(p * 100);
+    const classes = ["bar"];
+    if (p > 0) classes.push("filled");
+    if (profile.inPeak(h)) classes.push("peak");
+    const height = Math.max(4, Math.round(p / maxShare * 100));
+    return `<div class="${classes.join(" ")}" style="height:${height}%" data-tip="${t("history.activityHourTip", { time: fmtClockHour(h), pct })}"></div>`;
+  }).join("");
+  box.innerHTML = `
+    <div class="activity-head">
+      <span class="activity-label">${t("history.activityPeakLabel")}</span>
+      <span class="activity-peak">${fmtClockHour(profile.peakStart)} – ${fmtClockHour(profile.peakEnd)}</span>
+    </div>
+    <div class="activity-meta">${t("history.activityPeakMeta", { days: profile.days, hit: profile.peakHit })}</div>
+    <div class="hbars">${bars}</div>
+    <div class="hbar-labels">${hourAxisHtml()}</div>
+    <div class="activity-note">${t("history.activityNote")}</div>`;
 }
 
 function themeColor(name, fallback) {
@@ -1272,9 +1398,9 @@ document.getElementById("btn-mini").addEventListener("click", () => {
 document.getElementById("btn-phone").addEventListener("click", async () => {
   if (!window.babybump) return;
   const info = await window.babybump.syncInfo();
-  const text = `手机与电脑连接同一 Wi‑Fi 后，在手机浏览器打开：\n\n${info.url}\n\n首次打开后可添加到手机主屏幕。`;
+  const text = t("settings.phonePair", { url: info.url });
   if (navigator.clipboard) navigator.clipboard.writeText(info.url).catch(() => {});
-  toast(text.replace(/\n/g, " "));
+  toast(t("toast.phonePairCopied"));
   alert(text);
 });
 document.getElementById("set-remind-time").addEventListener("change", e => {
@@ -1296,14 +1422,14 @@ document.getElementById("set-anomaly").addEventListener("click", e => {
   toast(newVal ? t("toast.anomalyOn") : t("toast.anomalyOff"));
 });
 document.getElementById("btn-export").addEventListener("click", () => {
-  const rows = [["日期","时间","来源"]];
+  const rows = [[t("settings.exportDate"), t("settings.exportTime"), t("settings.exportSource")]];
   state.records.slice().sort((a,b) => a.ts - b.ts).forEach(r => {
     rows.push([fmtDate(r.ts), fmtTime(r.ts), r.src === "session" ? t("today.sourceSession") : t("today.sourceManual")]);
   });
   const csv = "\ufeff" + rows.map(r => r.join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  a.download = "BabyBump-胎动记录.csv";
+  a.download = t("settings.exportFile");
   a.click();
   toast(t("toast.exported"));
 });
@@ -1347,6 +1473,7 @@ function toast(msg) {
 /* 从主进程加载持久化数据（替代 localStorage） */
 async function init() {
   await initI18n();
+  applyDocumentMeta();
   if (window.babybump) {
     const s = await window.babybump.load();
     if (s && s.records) {
@@ -1368,7 +1495,7 @@ async function init() {
     window.babybump.onLocaleChanged(({ lang, locale }) => {
       currentLang = lang;
       localeData = locale;
-      document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+      applyDocumentMeta();
       applyTranslations();
       renderAll();
       updateSettingsUI();

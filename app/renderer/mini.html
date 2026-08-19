@@ -289,6 +289,7 @@ function applyLocale(lang, locale) {
   if (lang) currentLang = lang;
   if (locale) localeData = locale;
   document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+  document.title = t("app.miniTitle");
   applyTranslations();
 }
 

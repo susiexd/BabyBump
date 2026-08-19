@@ -82,10 +82,15 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     const value = t(key);
-    if (value !== key && el.children.length === 0) {
-      el.textContent = value;
+    if (value !== key) {
+      if (/<[a-z][\s\S]*>/i.test(value)) el.innerHTML = value;
+      else if (el.children.length === 0) el.textContent = value;
     }
   });
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('app.pwaTitle');
+  const desc = document.querySelector('meta[name="description"]');
+  if (desc) desc.setAttribute('content', t('app.pwaDescription'));
 }
 
 function applyThemeFromSettings() {

@@ -95,6 +95,9 @@ function setLocale(lang) {
   saveState(state);
   // 重建托盘菜单
   if (tray) tray.setContextMenu(buildTrayMenu());
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setTitle(t("app.title"));
+  }
   // 通知渲染进程语言已变更
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("locale:changed", { lang, locale: currentLocale });
@@ -288,7 +291,7 @@ function createWindow() {
     height: saved && saved.height >= 620 ? saved.height : 780,
     minWidth: 860,
     minHeight: 620,
-    title: "BabyBump · 胎动记录",
+    title: t("app.title"),
     icon: path.join(__dirname, "assets", "icon.png"),
     backgroundColor: themeBackground(),
     webPreferences: {
